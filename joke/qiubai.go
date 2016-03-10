@@ -1,6 +1,7 @@
 package joke
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"math/rand"
@@ -29,14 +30,21 @@ func (h *JokeHook) Process(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) (process
 		m := tgbotapi.NewMessage(msg.Chat.ID, j.Text)
 		m.ReplyToMessageID = msg.MessageID
 		bot.Send(m)
+
+		if j.Image != nil {
+			m := tgbotapi.NewPhotoUpload(msg.Chat.ID, j.Image)
+			bot.Send(m)
+		}
+
 		return true
 	}
 	return false
 }
 
 type Joke struct {
-	ID   int
-	Text string
+	ID    int
+	Text  string
+	Image *bytes.Buffer
 }
 
 func (h *JokeHook) getJoke() *Joke {
@@ -62,7 +70,13 @@ func (h *JokeHook) getJoke() *Joke {
 			}
 		}
 		h.oldJokes = append(h.oldJokes, id)
-		t := strings.TrimSpace(goquery.NewDocumentFromNode(n).Find("div.content").Text())
-		return &Joke{id, t}
+		content := goquery.NewDocumentFromNode(n).Find("div.content")
+		t := strings.TrimSpace(content.Text())
+
+		if imgs := content.Find("img"); imgs.Length() > 0 {
+
+		}
+
+		return &Joke{id, t, img}
 	}
 }
