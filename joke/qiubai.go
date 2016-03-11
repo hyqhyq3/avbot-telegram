@@ -17,7 +17,7 @@ import (
 	"gopkg.in/telegram-bot-api.v2"
 )
 
-var url = "http://www.qiushibaike.com/pic/%d"
+var url = "http://www.qiushibaike.com/8hr/page/%d"
 
 type JokeHook struct {
 	oldJokes []int
@@ -37,7 +37,7 @@ func (h *JokeHook) Process(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) (process
 		bot.Send(m)
 
 		if j.Image != nil {
-			m := tgbotapi.NewPhotoUpload(msg.Chat.ID, j.Image)
+			m := tgbotapi.NewPhotoUpload(msg.Chat.ID, *j.Image)
 			bot.Send(m)
 		}
 
@@ -49,7 +49,7 @@ func (h *JokeHook) Process(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) (process
 type Joke struct {
 	ID    int
 	Text  string
-	Image io.Reader
+	Image *tgbotapi.FileBytes
 }
 
 func (h *JokeHook) getJoke() (j *Joke) {
@@ -98,7 +98,7 @@ NextJoke:
 					b := &bytes.Buffer{}
 					io.Copy(b, resp.Body)
 					resp.Body.Close()
-					j.Image = b
+					j.Image = &tgbotapi.FileBytes{Name: "test.jpg", Bytes: b.Bytes()}
 					break
 				}
 			}
