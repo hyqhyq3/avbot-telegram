@@ -3,16 +3,21 @@ package joke
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
+	"net/http"
 	"strconv"
 	"strings"
+
+	_ "image/jpeg"
+	_ "image/png"
 
 	"github.com/PuerkitoBio/goquery"
 	"gopkg.in/telegram-bot-api.v2"
 )
 
-var url = "http://www.qiushibaike.com/8hr/page/%d"
+var url = "http://www.qiushibaike.com/pic/%d"
 
 type JokeHook struct {
 	oldJokes []int
@@ -44,12 +49,21 @@ func (h *JokeHook) Process(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) (process
 type Joke struct {
 	ID    int
 	Text  string
-	Image *bytes.Buffer
+	Image io.Reader
 }
 
-func (h *JokeHook) getJoke() *Joke {
+func (h *JokeHook) getJoke() (j *Joke) {
+	defer func() {
+		e := recover()
+		if e != nil {
+			log.Println("joke.getJoke", e)
+		}
+	}()
+	j = &Joke{}
+NextJoke:
 	for {
-		doc, err := goquery.NewDocument(fmt.Sprintf(url, rand.Int()%30))
+		u := fmt.Sprintf(url, rand.Int()%30)
+		doc, err := goquery.NewDocument(u)
 		if err != nil {
 			log.Println("joke.getJoke", err)
 			return &Joke{ID: -1, Text: "获取笑话出错"}
@@ -57,26 +71,39 @@ func (h *JokeHook) getJoke() *Joke {
 		arr := doc.Find(".article")
 
 		n := arr.Nodes[rand.Int()%arr.Length()]
-		var id int
 		for _, a := range n.Attr {
 			if a.Key == "id" {
 				pos := strings.IndexAny(a.Val, "0123456789")
-				id, _ = strconv.Atoi(a.Val[pos:])
+				j.ID, _ = strconv.Atoi(a.Val[pos:])
 			}
 		}
 		for _, i := range h.oldJokes {
-			if i == id {
-				continue
+			if i == j.ID {
+				continue NextJoke
 			}
 		}
-		h.oldJokes = append(h.oldJokes, id)
+		h.oldJokes = append(h.oldJokes, j.ID)
 		content := goquery.NewDocumentFromNode(n).Find("div.content")
-		t := strings.TrimSpace(content.Text())
+		j.Text = strings.TrimSpace(content.Text())
 
-		if imgs := content.Find("img"); imgs.Length() > 0 {
-
+		if imgs := goquery.NewDocumentFromNode(n).Find("div.thumb").Find("img"); imgs.Length() > 0 {
+			for _, a := range imgs.Nodes[0].Attr {
+				if a.Key == "src" {
+					r, _ := http.NewRequest("GET", a.Val, nil)
+					r.Header.Set("Referer", u)
+					resp, err := http.DefaultClient.Do(r)
+					if err != nil {
+						break
+					}
+					b := &bytes.Buffer{}
+					io.Copy(b, resp.Body)
+					resp.Body.Close()
+					j.Image = b
+					break
+				}
+			}
 		}
 
-		return &Joke{id, t, img}
+		return
 	}
 }
