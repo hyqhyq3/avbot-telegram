@@ -12,7 +12,7 @@ func main() {
 	//	bot.SetProxy("socks5://127.0.0.1:1080")
 	bot.AddMessageHook(joke.New())
 	bot.AddMessageHook(hello.New(`
-@{{.Name}} 你好,欢迎你加入本群.请在十分钟内回答以下问题: (直接回答到本群聊天里,不要回复给机器人) 
+@{{.UserName}}({{.FirstName}}) 你好,欢迎你加入本群.请在十分钟内回答以下问题: (直接回答到本群聊天里,不要回复给机器人) 
 1. 你从事什么工作?喜欢什么语言 
 2. 怎么看待 C 和 C++ 
 3. 从哪里听说本群的? 加入的主要目的是什么 
