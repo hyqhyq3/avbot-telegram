@@ -4,6 +4,7 @@ import (
 	"github.com/hyqhyq3/avbot-telegram"
 	"github.com/hyqhyq3/avbot-telegram/hello"
 	"github.com/hyqhyq3/avbot-telegram/joke"
+	"github.com/hyqhyq3/avbot-telegram/stat"
 )
 
 func main() {
@@ -22,5 +23,6 @@ func main() {
 * avplayer 社区建立了维基站点 http://wiki.avplayer.org , 有问题先到维基查找相关信息. 如果 wiki 上没有, 你获得了群友的回答,麻烦到维基上建立相关条目, 以方便后来人. wiki 公开编辑权限, 无需注册.  
 * 问一些需要时间思考的问题请到论坛里发帖, 特别是 Boost 相关的问题. https://avboost.com.  
 * 长期潜水的人都会被强制清理. 伸手党会被立即清理. 十分钟内没有回答的人会被管理员请出群, 请不要无视机器人的通告. 管理员都是疯子,做好被虐待的准备,大胆发言.`))
+	bot.AddMessageHook(stat.New("stat.dat"))
 	bot.Run()
 }

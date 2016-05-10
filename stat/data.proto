@@ -1,0 +1,20 @@
+syntax = "proto3";
+package stat;
+
+message User
+{
+    int32 Count = 1;
+    string FirstName = 2;
+    string LastName = 3;
+    string UserName = 4;
+};
+
+message Group
+{
+    map<int32, User> Users = 1;
+};
+
+message Store
+{
+    map<int32, Group> Groups = 1;
+};
