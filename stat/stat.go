@@ -90,7 +90,7 @@ func (h *StatHook) GetStat(id int) string {
 
 	var str = ""
 	for i := 0; i < min(10, len(data)); i++ {
-		str = str + fmt.Sprintf("%s: %d\n", data[i].UserName, data[i].Count)
+		str = str + fmt.Sprintf("%s %s: %d\n", data[i].FirstName, data[i].LastName, data[i].Count)
 	}
 	return str
 }
