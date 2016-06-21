@@ -5,12 +5,14 @@ import (
 	"github.com/hyqhyq3/avbot-telegram/hello"
 	"github.com/hyqhyq3/avbot-telegram/joke"
 	"github.com/hyqhyq3/avbot-telegram/stat"
+	"github.com/hyqhyq3/avbot-telegram/irc"
 )
 
 func main() {
 	bot := avbot.NewBot("154517069:AAElhGUMLDA4mV9isLQDgfJoBOpdSSu3Ch0")
 	//bot := avbot.NewBot("148772277:AAEnpizxwjkHA3M6j2u0edTUPssuIXLXhHM")
 	//	bot.SetProxy("socks5://127.0.0.1:1080")
+	bot.AddMessageHook(irc.New(bot.GetBotApi(), "#avplayer", "avbot-tg"))
 	bot.AddMessageHook(joke.New())
 	bot.AddMessageHook(hello.New(`
 @{{.UserName}}({{.FirstName}}) 你好,欢迎你加入本群.请在十分钟内回答以下问题: (直接回答到本群聊天里,不要回复给机器人) 

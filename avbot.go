@@ -52,3 +52,7 @@ func (b *AVBot) onMessage(msg *tgbotapi.Message) {
 		}
 	}
 }
+
+func (b *AVBot) GetBotApi() *tgbotapi.BotAPI {
+	return b.BotAPI
+}
