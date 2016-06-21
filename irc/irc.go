@@ -37,15 +37,13 @@ func (h *JokeHook) SendToIrc(text string) {
 		h.ConnectToIrc()
 	}
 	if h.Irc != nil {
-		msg := &irc.Message{Command: irc.PRIVMSG, Params: []string{h.ch, text}}
+		msg := &irc.Message{Command: irc.PRIVMSG, Params: []string{h.ch}, Trailing: text}
 		h.Irc.Encode(msg)
 	}
 }
 
 func (h *JokeHook) SendToTg(text string) {
-	fmt.Println("send to tg")
 	if h.chatId != 0 {
-		fmt.Println("send to group")
 		msg := tgbotapi.NewMessage(h.chatId, text)
 		h.bot.Send(msg)
 	}
