@@ -51,7 +51,7 @@ func (h *StatHook) Process(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) (process
 		h.Save()
 	}
 	cmd := strings.Split(msg.Text, " ")
-	if cmd[0] == "/stat" {
+	if cmd[0] == "/stat" || cmd[0] == "/stat@" + bot.Self.UserName {
 		mymsg := tgbotapi.NewMessage(msg.Chat.ID, h.GetStat(msg.Chat.ID))
 		bot.Send(mymsg)
 	}
