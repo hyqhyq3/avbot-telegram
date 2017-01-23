@@ -1,15 +1,45 @@
 package main
 
 import (
+	"flag"
+	"io/ioutil"
+
+	"github.com/go-yaml/yaml"
 	"github.com/hyqhyq3/avbot-telegram"
+	"github.com/hyqhyq3/avbot-telegram/github-webhook"
 	"github.com/hyqhyq3/avbot-telegram/hello"
 	"github.com/hyqhyq3/avbot-telegram/irc"
 	"github.com/hyqhyq3/avbot-telegram/joke"
 	"github.com/hyqhyq3/avbot-telegram/stat"
 )
 
+type Config struct {
+	Secret string
+
+	Github struct {
+		Listen string
+	}
+}
+
+var config Config
+
+func init() {
+
+	var configFile string
+	flag.StringVar(&configFile, "c", "avbot.yaml", "config file")
+	flag.Parse()
+	data, err := ioutil.ReadFile(configFile)
+	if err != nil {
+		panic(err)
+	}
+
+	yaml.Unmarshal(data, &config)
+
+}
+
 func main() {
-	bot := avbot.NewBot("154517069:AAElhGUMLDA4mV9isLQDgfJoBOpdSSu3Ch0")
+
+	bot := avbot.NewBot(config.Secret)
 	//bot := avbot.NewBot("148772277:AAEnpizxwjkHA3M6j2u0edTUPssuIXLXhHM")
 	//	bot.SetProxy("socks5://127.0.0.1:1080")
 	bot.AddMessageHook(irc.New(bot.GetBotApi(), "#avplayer", "avbot-tg"))
@@ -26,5 +56,7 @@ func main() {
 * 问一些需要时间思考的问题请到论坛里发帖, 特别是 Boost 相关的问题. https://www.avboost.com.  
 * 长期潜水的人都会被强制清理. 伸手党会被立即清理. 十分钟内没有回答的人会被管理员请出群, 请不要无视机器人的通告. 管理员都是疯子,做好被虐待的准备,大胆发言.`))
 	bot.AddMessageHook(stat.New("stat.dat"))
+
+	bot.AddMessageHook(github.New(bot.GetBotApi(), -1001041314546, config.Github.Listen))
 	bot.Run()
 }
