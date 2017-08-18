@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 	"sync"
@@ -24,15 +25,17 @@ type Message struct {
 
 type WSChatServer struct {
 	websocket.Server
-	clients     map[string]*websocket.Conn
+	clients     map[int]*websocket.Conn
 	clientMutex sync.Mutex
 	bot         *tgbotapi.BotAPI
 	chatId      int
+	index       int
 }
 
 func New(bot *tgbotapi.BotAPI, port int) avbot.MessgaeHook {
 	handler := &WSChatServer{bot: bot}
-	handler.clients = make(map[string]*websocket.Conn)
+	handler.index = 1
+	handler.clients = make(map[int]*websocket.Conn)
 	handler.Handler = handler.OnNewClient
 	go func() { http.ListenAndServe(":"+strconv.Itoa(port), handler) }()
 	return handler
@@ -65,17 +68,28 @@ func (ws *WSChatServer) Broadcast(msg *Message) {
 }
 
 func (ws *WSChatServer) OnNewClient(c *websocket.Conn) {
+
 	ws.clientMutex.Lock()
-	ws.clients[c.RemoteAddr().String()] = c
+	index := ws.index
+	ws.index++
+	ws.clients[index] = c
+	log.Println("new client")
 	ws.clientMutex.Unlock()
 
 	msg := &Message{}
 	for {
 		if err := websocket.JSON.Receive(c, msg); err == nil {
+			log.Println("received message ", msg)
 			tgmsg := tgbotapi.NewMessage(ws.chatId, msg.Data.Msg)
 			ws.bot.Send(tgmsg)
 		}
 	}
+	c.Close()
+
+	ws.clientMutex.Lock()
+	log.Println("client disconnected")
+	delete(ws.clients, index)
+	ws.clientMutex.Unlock()
 }
 
 func getNow() int {
