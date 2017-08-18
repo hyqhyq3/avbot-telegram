@@ -80,8 +80,9 @@ func (ws *WSChatServer) OnNewClient(c *websocket.Conn) {
 	for {
 		if err := websocket.JSON.Receive(c, msg); err == nil {
 			log.Println("received message ", msg)
-			tgmsg := tgbotapi.NewMessage(ws.chatId, msg.Data.From + ": " + msg.Data.Msg)
+			tgmsg := tgbotapi.NewMessage(ws.chatId, msg.Data.From+": "+msg.Data.Msg)
 			ws.bot.Send(tgmsg)
+			ws.Broadcast(msg)
 		}
 	}
 	c.Close()
