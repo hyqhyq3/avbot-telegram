@@ -11,6 +11,7 @@ import (
 	"github.com/hyqhyq3/avbot-telegram/irc"
 	"github.com/hyqhyq3/avbot-telegram/joke"
 	"github.com/hyqhyq3/avbot-telegram/stat"
+	"github.com/hyqhyq3/avbot-telegram/ws"
 )
 
 type Config struct {
@@ -18,6 +19,10 @@ type Config struct {
 
 	Github struct {
 		Listen string
+	}
+
+	WebSocket struct {
+		Port int
 	}
 }
 
@@ -43,6 +48,7 @@ func main() {
 	//bot := avbot.NewBot("148772277:AAEnpizxwjkHA3M6j2u0edTUPssuIXLXhHM")
 	//	bot.SetProxy("socks5://127.0.0.1:1080")
 	bot.AddMessageHook(irc.New(bot.GetBotApi(), "#avplayer", "avbot-tg"))
+	bot.AddMessageHook(ws.New(bot.GetBotApi(), config.WebSocket.Port))
 	bot.AddMessageHook(joke.New())
 	bot.AddMessageHook(hello.New(`
 @{{.UserName}}({{.FirstName}}) 你好,欢迎你加入本群.请在十分钟内回答以下问题: (直接回答到本群聊天里,不要回复给机器人) 
