@@ -17,6 +17,8 @@ import (
 type Config struct {
 	Secret string
 
+	SuperGroup string
+
 	Github struct {
 		Listen string
 	}
@@ -49,9 +51,9 @@ func init() {
 func main() {
 
 	token := config.Secret
-	bot := avbot.NewBot(token, config.Proxy.Socks5)
-	bot.AddMessageHook(irc.New(bot.GetBotApi(), "#avplayer", "avbot-tg"))
-	bot.AddMessageHook(ws.New(bot.GetBotApi(), token, config.WebSocket.Port))
+	bot := avbot.NewBot(token, config.SuperGroup, config.Proxy.Socks5)
+	bot.AddMessageHook(irc.New(bot, "#avplayer", "avbot-tg"))
+	bot.AddMessageHook(ws.New(bot, token, config.WebSocket.Port))
 	bot.AddMessageHook(joke.New())
 	bot.AddMessageHook(hello.New(`
 @{{.UserName}}({{.FirstName}}) 你好,欢迎你加入本群.请在十分钟内回答以下问题: (直接回答到本群聊天里,不要回复给机器人) 
@@ -66,6 +68,6 @@ func main() {
 * 长期潜水的人都会被强制清理. 伸手党会被立即清理. 十分钟内没有回答的人会被管理员请出群, 请不要无视机器人的通告. 管理员都是疯子,做好被虐待的准备,大胆发言.`))
 	bot.AddMessageHook(stat.New("stat.dat"))
 
-	bot.AddMessageHook(github.New(bot.GetBotApi(), -1001041314546, config.Github.Listen))
+	bot.AddMessageHook(github.New(bot, config.Github.Listen))
 	bot.Run()
 }

@@ -1,7 +1,7 @@
 package avbot
 
-import "gopkg.in/telegram-bot-api.v2"
+import "gopkg.in/telegram-bot-api.v4"
 
 type MessgaeHook interface {
-	Process(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) (processed bool)
+	Process(bot *AVBot, msg *tgbotapi.Message) (processed bool)
 }

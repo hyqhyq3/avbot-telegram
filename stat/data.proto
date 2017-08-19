@@ -11,10 +11,10 @@ message User
 
 message Group
 {
-    map<int32, User> Users = 1;
+    map<int64, User> Users = 1;
 };
 
 message Store
 {
-    map<int32, Group> Groups = 1;
+    map<int64, Group> Groups = 1;
 };

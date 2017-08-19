@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"text/template"
 
-	"gopkg.in/telegram-bot-api.v2"
+	avbot "github.com/hyqhyq3/avbot-telegram"
+	"gopkg.in/telegram-bot-api.v4"
 )
 
 type HelloHook struct {
@@ -16,10 +17,10 @@ func New(str string) *HelloHook {
 	return &HelloHook{template.Must(tpl.Parse(str))}
 }
 
-func (h *HelloHook) Process(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) (processed bool) {
-	if msg.NewChatParticipant.ID != 0 {
+func (h *HelloHook) Process(bot *avbot.AVBot, msg *tgbotapi.Message) (processed bool) {
+	if msg.NewChatMember != nil {
 		b := &bytes.Buffer{}
-		h.Execute(b, map[string]string{"UserName": msg.NewChatParticipant.UserName, "FirstName": msg.NewChatParticipant.FirstName})
+		h.Execute(b, map[string]string{"UserName": msg.NewChatMember.UserName, "FirstName": msg.NewChatMember.FirstName})
 		m := tgbotapi.NewMessage(msg.Chat.ID, b.String())
 		bot.Send(m)
 	}

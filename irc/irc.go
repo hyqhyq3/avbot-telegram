@@ -3,28 +3,29 @@ package irc
 import (
 	"fmt"
 
+	avbot "github.com/hyqhyq3/avbot-telegram"
 	"gopkg.in/sorcix/irc.v1"
-	"gopkg.in/telegram-bot-api.v2"
+	"gopkg.in/telegram-bot-api.v4"
 )
 
 type JokeHook struct {
-	Irc  *irc.Conn
-	bot  *tgbotapi.BotAPI
-	chatId int
-	ch   string
-	nick string
+	Irc    *irc.Conn
+	bot    *avbot.AVBot
+	chatId int64
+	ch     string
+	nick   string
 }
 
-func New(bot *tgbotapi.BotAPI, ch, nick string) *JokeHook {
+func New(bot *avbot.AVBot, ch, nick string) *JokeHook {
 	return &JokeHook{
-		bot:  bot,
-		ch:   ch,
-		nick: nick,
+		bot:    bot,
+		ch:     ch,
+		nick:   nick,
 		chatId: 0,
 	}
 }
 
-func (h *JokeHook) Process(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) (processed bool) {
+func (h *JokeHook) Process(bot *avbot.AVBot, msg *tgbotapi.Message) (processed bool) {
 	h.SendToIrc(msg.From.FirstName + ":" + msg.Text)
 	if msg.Chat.Type == "group" || msg.Chat.Type == "supergroup" {
 		h.chatId = msg.Chat.ID
@@ -62,7 +63,6 @@ func (h *JokeHook) ConnectToIrc() {
 	msg = &irc.Message{Command: irc.USER, Params: []string{"guest", "0", "*", ":" + h.nick}}
 	c.Encode(msg)
 
-
 	msg = &irc.Message{Command: irc.NICK, Params: []string{h.nick}}
 	c.Encode(msg)
 
@@ -73,9 +73,9 @@ func (h *JokeHook) ConnectToIrc() {
 	go h.HandleIrc()
 }
 
-func (h*JokeHook) HandleIrc() {
+func (h *JokeHook) HandleIrc() {
 	for {
-		msg,err := h.Irc.Decode()
+		msg, err := h.Irc.Decode()
 		if err != nil {
 			h.Irc = nil
 			break

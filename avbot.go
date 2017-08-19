@@ -6,20 +6,21 @@ import (
 	"net/http"
 
 	"golang.org/x/net/proxy"
-	"gopkg.in/telegram-bot-api.v2"
+	tgbotapi "gopkg.in/telegram-bot-api.v4"
 )
 
 type AVBot struct {
 	*tgbotapi.BotAPI
-	hooks  []MessgaeHook
-	client *http.Client
+	hooks       []MessgaeHook
+	client      *http.Client
+	groupChatId int64
 }
 
 func (b *AVBot) AddMessageHook(hook MessgaeHook) {
 	b.hooks = append(b.hooks, hook)
 }
 
-func NewBot(token string, socks5Addr string) *AVBot {
+func NewBot(token string, group string, socks5Addr string) *AVBot {
 	dial := net.Dial
 	if socks5Addr != "" {
 		dialer, err := proxy.SOCKS5("tcp", socks5Addr, nil, proxy.Direct)
@@ -38,10 +39,23 @@ func NewBot(token string, socks5Addr string) *AVBot {
 	if err != nil {
 		panic(err)
 	}
+
+	var chatId int64
+	if group != "" {
+		chat, err := bot.GetChat(tgbotapi.ChatConfig{SuperGroupUsername: "@" + group})
+		if err != nil {
+			log.Printf("got group %s", group)
+			panic(err)
+		}
+		chatId = chat.ID
+		log.Printf("got group %s id %d\n", group, chatId)
+	}
+
 	return &AVBot{
-		BotAPI: bot,
-		hooks:  make([]MessgaeHook, 0, 0),
-		client: client,
+		BotAPI:      bot,
+		hooks:       make([]MessgaeHook, 0, 0),
+		client:      client,
+		groupChatId: chatId,
 	}
 }
 
@@ -59,14 +73,14 @@ func (b *AVBot) Run() {
 	}
 
 	for update := range updates {
-		b.onMessage(&update.Message)
+		b.onMessage(update.Message)
 	}
 }
 
 func (b *AVBot) onMessage(msg *tgbotapi.Message) {
 
 	for _, h := range b.hooks {
-		if h.Process(b.BotAPI, msg) {
+		if h.Process(b, msg) {
 			break
 		}
 	}
@@ -74,4 +88,8 @@ func (b *AVBot) onMessage(msg *tgbotapi.Message) {
 
 func (b *AVBot) GetBotApi() *tgbotapi.BotAPI {
 	return b.BotAPI
+}
+
+func (b *AVBot) GetGroupChatId() int64 {
+	return b.groupChatId
 }

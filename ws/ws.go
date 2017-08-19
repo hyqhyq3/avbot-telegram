@@ -13,7 +13,7 @@ import (
 
 	"github.com/hyqhyq3/avbot-telegram"
 	"golang.org/x/net/websocket"
-	"gopkg.in/telegram-bot-api.v2"
+	"gopkg.in/telegram-bot-api.v4"
 )
 
 type MessageData struct {
@@ -34,13 +34,12 @@ type WSChatServer struct {
 	websocket.Server
 	clients     map[int]*websocket.Conn
 	clientMutex sync.Mutex
-	bot         *tgbotapi.BotAPI
-	chatId      int
+	bot         *avbot.AVBot
 	index       int
 	Token       string
 }
 
-func New(bot *tgbotapi.BotAPI, token string, port int) avbot.MessgaeHook {
+func New(bot *avbot.AVBot, token string, port int) avbot.MessgaeHook {
 	handler := &WSChatServer{bot: bot}
 	handler.index = 1
 	handler.clients = make(map[int]*websocket.Conn)
@@ -53,11 +52,7 @@ func New(bot *tgbotapi.BotAPI, token string, port int) avbot.MessgaeHook {
 	return handler
 }
 
-func (ws *WSChatServer) Process(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) bool {
-
-	if msg.Chat.Type == "group" || msg.Chat.Type == "supergroup" {
-		ws.chatId = msg.Chat.ID
-	}
+func (ws *WSChatServer) Process(bot *avbot.AVBot, msg *tgbotapi.Message) bool {
 
 	go ws.AsyncGetWsMsg(msg, func(wsMsg *Message) {
 		if wsMsg != nil {
@@ -80,8 +75,8 @@ func (ws *WSChatServer) AsyncGetWsMsg(msg *tgbotapi.Message, cb func(wsMsg *Mess
 				From:      msg.From.FirstName,
 			},
 		}
-	case msg.Photo != nil && len(msg.Photo) > 0:
-		file, err := ws.bot.GetFile(tgbotapi.FileConfig{FileID: msg.Photo[0].FileID})
+	case msg.Photo != nil && len(*msg.Photo) > 0:
+		file, err := ws.bot.GetFile(tgbotapi.FileConfig{FileID: (*msg.Photo)[0].FileID})
 		if err != nil {
 			log.Println(err)
 			return
@@ -155,16 +150,17 @@ func (ws *WSChatServer) OnNewClient(c *websocket.Conn) {
 
 func (ws *WSChatServer) AsyncGetTgMsg(msg *Message, cb func(tgbotapi.Chattable)) {
 	var tgmsg tgbotapi.Chattable
+	chatId := ws.bot.GetGroupChatId()
 
 	switch msg.Cmd {
 	case 1:
-		tgmsg = tgbotapi.NewMessage(ws.chatId, msg.Data.From+": "+msg.Data.Msg)
+		tgmsg = tgbotapi.NewMessage(chatId, msg.Data.From+": "+msg.Data.Msg)
 	case 2:
 		data, err := base64.StdEncoding.DecodeString(msg.Data.ImgData)
 		if err != nil {
 			log.Println("image data error")
 		}
-		tgmsg = tgbotapi.NewPhotoUpload(ws.chatId, tgbotapi.FileBytes{
+		tgmsg = tgbotapi.NewPhotoUpload(chatId, tgbotapi.FileBytes{
 			Name:  getRandomImageName(msg.Data.ImgType),
 			Bytes: data,
 		})

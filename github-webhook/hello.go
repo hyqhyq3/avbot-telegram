@@ -6,18 +6,17 @@ import (
 	"log"
 	"net/http"
 
-	"gopkg.in/telegram-bot-api.v2"
+	avbot "github.com/hyqhyq3/avbot-telegram"
+	"gopkg.in/telegram-bot-api.v4"
 )
 
 type GithubHook struct {
 	server *http.Server
-	bot    *tgbotapi.BotAPI
-	chatID int
+	bot    *avbot.AVBot
 }
 
-func New(bot *tgbotapi.BotAPI, chatID int, addr string) (ret *GithubHook) {
+func New(bot *avbot.AVBot, addr string) (ret *GithubHook) {
 	ret = &GithubHook{}
-	ret.chatID = chatID
 	ret.bot = bot
 	ret.server = &http.Server{
 		Addr:    addr,
@@ -72,13 +71,13 @@ func (h *GithubHook) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				w.Write([]byte("OK"))
 				return
 			}
-			m := tgbotapi.NewMessage(h.chatID, string(evt.Sender.Login+" "+evt.Action+" "+desc))
+			m := tgbotapi.NewMessage(h.bot.GetGroupChatId(), string(evt.Sender.Login+" "+evt.Action+" "+desc))
 			h.bot.Send(m)
 		}
 	}
 	w.Write([]byte("OK"))
 }
 
-func (h *GithubHook) Process(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) (processed bool) {
+func (h *GithubHook) Process(bot *avbot.AVBot, msg *tgbotapi.Message) (processed bool) {
 	return false
 }

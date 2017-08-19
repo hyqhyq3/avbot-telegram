@@ -10,19 +10,20 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/proto"
+	avbot "github.com/hyqhyq3/avbot-telegram"
 
-	"gopkg.in/telegram-bot-api.v2"
+	"gopkg.in/telegram-bot-api.v4"
 )
 
 type StatHook struct {
 	filename string
-	Groups   map[int32]*Group
+	Groups   map[int64]*Group
 }
 
 func New(filename string) (h *StatHook) {
 
 	h = &StatHook{}
-	h.Groups = make(map[int32]*Group)
+	h.Groups = make(map[int64]*Group)
 	h.filename = filename
 
 	b, err := ioutil.ReadFile(filename)
@@ -45,13 +46,13 @@ func New(filename string) (h *StatHook) {
 	return
 }
 
-func (h *StatHook) Process(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) (processed bool) {
+func (h *StatHook) Process(bot *avbot.AVBot, msg *tgbotapi.Message) (processed bool) {
 	if msg != nil {
-		h.Inc(&msg.Chat, &msg.From)
+		h.Inc(msg.Chat, msg.From)
 		h.Save()
 	}
 	cmd := strings.Split(msg.Text, " ")
-	if cmd[0] == "/stat" || cmd[0] == "/stat@" + bot.Self.UserName {
+	if cmd[0] == "/stat" || cmd[0] == "/stat@"+bot.Self.UserName {
 		mymsg := tgbotapi.NewMessage(msg.Chat.ID, h.GetStat(msg.Chat.ID))
 		bot.Send(mymsg)
 	}
@@ -81,9 +82,9 @@ func min(a, b int) int {
 	return b
 }
 
-func (h *StatHook) GetStat(id int) string {
+func (h *StatHook) GetStat(id int64) string {
 	data := make([]*User, 0)
-	for _, v := range h.Groups[int32(id)].Users {
+	for _, v := range h.Groups[id].Users {
 		data = append(data, v)
 	}
 	sort.Sort(Users(data))
@@ -96,10 +97,10 @@ func (h *StatHook) GetStat(id int) string {
 }
 
 func (h *StatHook) Inc(chat *tgbotapi.Chat, user *tgbotapi.User) {
-	var chatid = int32(chat.ID)
-	var uid = int32(user.ID)
+	var chatid = chat.ID
+	var uid = int64(user.ID)
 	if _, ok := h.Groups[chatid]; !ok {
-		h.Groups[chatid] = &Group{Users: make(map[int32]*User)}
+		h.Groups[chatid] = &Group{Users: make(map[int64]*User)}
 	}
 	if _, ok := h.Groups[chatid].Users[uid]; !ok {
 		h.Groups[chatid].Users[uid] = &User{}

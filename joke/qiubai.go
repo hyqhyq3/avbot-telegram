@@ -14,7 +14,8 @@ import (
 	_ "image/png"
 
 	"github.com/PuerkitoBio/goquery"
-	"gopkg.in/telegram-bot-api.v2"
+	avbot "github.com/hyqhyq3/avbot-telegram"
+	"gopkg.in/telegram-bot-api.v4"
 )
 
 var url = "http://www.qiushibaike.com/8hr/page/%d"
@@ -29,7 +30,7 @@ func New() *JokeHook {
 	}
 }
 
-func (h *JokeHook) Process(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) (processed bool) {
+func (h *JokeHook) Process(bot *avbot.AVBot, msg *tgbotapi.Message) (processed bool) {
 	if strings.Contains(msg.Text, "大爷") && strings.Contains(msg.Text, "笑话") {
 		j := h.getJoke()
 		m := tgbotapi.NewMessage(msg.Chat.ID, j.Text)
