@@ -17,7 +17,7 @@ import (
 type Config struct {
 	Secret string
 
-	SuperGroup string
+	GroupChatID int64
 
 	Github struct {
 		Listen string
@@ -51,7 +51,7 @@ func init() {
 func main() {
 
 	token := config.Secret
-	bot := avbot.NewBot(token, config.SuperGroup, config.Proxy.Socks5)
+	bot := avbot.NewBot(token, config.GroupChatID, config.Proxy.Socks5)
 	bot.AddMessageHook(irc.New(bot, "#avplayer", "avbot-tg"))
 	bot.AddMessageHook(ws.New(bot, token, config.WebSocket.Port))
 	bot.AddMessageHook(joke.New())

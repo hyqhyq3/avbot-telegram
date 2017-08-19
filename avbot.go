@@ -20,7 +20,7 @@ func (b *AVBot) AddMessageHook(hook MessgaeHook) {
 	b.hooks = append(b.hooks, hook)
 }
 
-func NewBot(token string, group string, socks5Addr string) *AVBot {
+func NewBot(token string, chatId int64, socks5Addr string) *AVBot {
 	dial := net.Dial
 	if socks5Addr != "" {
 		dialer, err := proxy.SOCKS5("tcp", socks5Addr, nil, proxy.Direct)
@@ -38,17 +38,6 @@ func NewBot(token string, group string, socks5Addr string) *AVBot {
 	bot, err := tgbotapi.NewBotAPIWithClient(token, client)
 	if err != nil {
 		panic(err)
-	}
-
-	var chatId int64
-	if group != "" {
-		chat, err := bot.GetChat(tgbotapi.ChatConfig{SuperGroupUsername: "@" + group})
-		if err != nil {
-			log.Printf("got group %s", group)
-			panic(err)
-		}
-		chatId = chat.ID
-		log.Printf("got group %s id %d\n", group, chatId)
 	}
 
 	return &AVBot{
