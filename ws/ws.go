@@ -131,13 +131,16 @@ func (ws *WSChatServer) OnNewClient(c *websocket.Conn) {
 
 	msg := &Message{}
 	for {
-		if err := websocket.JSON.Receive(c, msg); err == nil {
+		err := websocket.JSON.Receive(c, msg)
+		if err == nil {
 			log.Printf("received message type: %d from: %s text: %s", msg.Cmd, msg.Data.From, msg.Data.Msg)
 			go ws.AsyncGetTgMsg(msg, func(tgmsg tgbotapi.Chattable) {
 				ws.bot.Send(tgmsg)
 				ws.Broadcast(msg)
 			})
 
+		} else {
+			break
 		}
 	}
 	c.Close()
@@ -160,10 +163,12 @@ func (ws *WSChatServer) AsyncGetTgMsg(msg *Message, cb func(tgbotapi.Chattable))
 		if err != nil {
 			log.Println("image data error")
 		}
-		tgmsg = tgbotapi.NewPhotoUpload(chatId, tgbotapi.FileBytes{
+		photo := tgbotapi.NewPhotoUpload(chatId, tgbotapi.FileBytes{
 			Name:  getRandomImageName(msg.Data.ImgType),
 			Bytes: data,
 		})
+		photo.Caption = msg.Data.From + ":" + msg.Data.Caption
+		tgmsg = photo
 	}
 	if tgmsg != nil {
 		cb(tgmsg)
