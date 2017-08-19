@@ -51,7 +51,7 @@ func main() {
 	token := config.Secret
 	bot := avbot.NewBot(token, config.Proxy.Socks5)
 	bot.AddMessageHook(irc.New(bot.GetBotApi(), "#avplayer", "avbot-tg"))
-	bot.AddMessageHook(ws.New(bot.GetBotApi(), config.WebSocket.Port))
+	bot.AddMessageHook(ws.New(bot.GetBotApi(), token, config.WebSocket.Port))
 	bot.AddMessageHook(joke.New())
 	bot.AddMessageHook(hello.New(`
 @{{.UserName}}({{.FirstName}}) 你好,欢迎你加入本群.请在十分钟内回答以下问题: (直接回答到本群聊天里,不要回复给机器人) 

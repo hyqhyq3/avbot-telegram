@@ -1,8 +1,12 @@
 package ws
 
 import (
+	"encoding/base64"
+	"io/ioutil"
 	"log"
+	"mime"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -16,6 +20,9 @@ type MessageData struct {
 	Timestamp string `json:"timestamp"`
 	Msg       string `json:"msg"`
 	From      string `json:"from"`
+	ImgType   string `json:"img_type"`
+	ImgData   string `json:"img_data"`
+	Caption   string `json:"caption"`
 }
 
 type Message struct {
@@ -30,14 +37,19 @@ type WSChatServer struct {
 	bot         *tgbotapi.BotAPI
 	chatId      int
 	index       int
+	Token       string
 }
 
-func New(bot *tgbotapi.BotAPI, port int) avbot.MessgaeHook {
+func New(bot *tgbotapi.BotAPI, token string, port int) avbot.MessgaeHook {
 	handler := &WSChatServer{bot: bot}
 	handler.index = 1
 	handler.clients = make(map[int]*websocket.Conn)
 	handler.Handler = handler.OnNewClient
-	go func() { http.ListenAndServe(":"+strconv.Itoa(port), handler) }()
+	handler.Token = token
+	go func() {
+		log.Printf("listening websocket on %s\n", port)
+		http.ListenAndServe(":"+strconv.Itoa(port), handler)
+	}()
 	return handler
 }
 
@@ -46,17 +58,63 @@ func (ws *WSChatServer) Process(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) boo
 	if msg.Chat.Type == "group" || msg.Chat.Type == "supergroup" {
 		ws.chatId = msg.Chat.ID
 	}
-	ts := strconv.Itoa(getNow())
-	wsMsg := &Message{
-		Cmd: 1,
-		Data: MessageData{
-			Timestamp: ts,
-			Msg:       msg.Text,
-			From:      msg.From.FirstName,
-		},
-	}
-	ws.Broadcast(wsMsg)
+
+	go ws.AsyncGetWsMsg(msg, func(wsMsg *Message) {
+		if wsMsg != nil {
+			ws.Broadcast(wsMsg)
+		}
+	})
 	return false
+}
+
+func (ws *WSChatServer) AsyncGetWsMsg(msg *tgbotapi.Message, cb func(wsMsg *Message)) {
+	var wsMsg *Message
+	ts := strconv.Itoa(getNow())
+	switch {
+	case msg.Text != "":
+		wsMsg = &Message{
+			Cmd: 1,
+			Data: MessageData{
+				Timestamp: ts,
+				Msg:       msg.Text,
+				From:      msg.From.FirstName,
+			},
+		}
+	case msg.Photo != nil && len(msg.Photo) > 0:
+		file, err := ws.bot.GetFile(tgbotapi.FileConfig{FileID: msg.Photo[0].FileID})
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		link := file.Link(ws.Token)
+
+		resp, err := ws.bot.Client.Get(link)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		data, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		imgData := base64.StdEncoding.EncodeToString(data)
+		imgType := mime.TypeByExtension(filepath.Ext(file.FilePath))
+		wsMsg = &Message{
+			Cmd: 2,
+			Data: MessageData{
+				ImgType: imgType,
+				ImgData: imgData,
+				From:    msg.From.FirstName,
+				Caption: msg.Caption,
+			},
+		}
+	}
+
+	if wsMsg != nil {
+		cb(wsMsg)
+	}
+
 }
 
 func (ws *WSChatServer) Broadcast(msg *Message) {
