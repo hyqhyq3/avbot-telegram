@@ -2,27 +2,46 @@ package avbot
 
 import (
 	"log"
+	"net"
+	"net/http"
 
+	"golang.org/x/net/proxy"
 	"gopkg.in/telegram-bot-api.v2"
 )
 
 type AVBot struct {
 	*tgbotapi.BotAPI
-	hooks []MessgaeHook
+	hooks  []MessgaeHook
+	client *http.Client
 }
 
 func (b *AVBot) AddMessageHook(hook MessgaeHook) {
 	b.hooks = append(b.hooks, hook)
 }
 
-func NewBot(token string) *AVBot {
-	bot, err := tgbotapi.NewBotAPI(token)
+func NewBot(token string, socks5Addr string) *AVBot {
+	dial := net.Dial
+	if socks5Addr != "" {
+		dialer, err := proxy.SOCKS5("tcp", socks5Addr, nil, proxy.Direct)
+		if err != nil {
+			panic(err)
+		}
+		dial = dialer.Dial
+	}
+	client := &http.Client{
+		Transport: &http.Transport{
+			Dial: dial,
+		},
+	}
+
+	bot, err := tgbotapi.NewBotAPIWithClient(token, client)
 	if err != nil {
 		panic(err)
 	}
 	return &AVBot{
 		BotAPI: bot,
 		hooks:  make([]MessgaeHook, 0, 0),
+		client: client,
 	}
 }
 

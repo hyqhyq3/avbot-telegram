@@ -24,6 +24,10 @@ type Config struct {
 	WebSocket struct {
 		Port int
 	}
+
+	Proxy struct {
+		Socks5 string
+	}
 }
 
 var config Config
@@ -44,9 +48,8 @@ func init() {
 
 func main() {
 
-	bot := avbot.NewBot(config.Secret)
-	//bot := avbot.NewBot("148772277:AAEnpizxwjkHA3M6j2u0edTUPssuIXLXhHM")
-	//	bot.SetProxy("socks5://127.0.0.1:1080")
+	token := config.Secret
+	bot := avbot.NewBot(token, config.Proxy.Socks5)
 	bot.AddMessageHook(irc.New(bot.GetBotApi(), "#avplayer", "avbot-tg"))
 	bot.AddMessageHook(ws.New(bot.GetBotApi(), config.WebSocket.Port))
 	bot.AddMessageHook(joke.New())
