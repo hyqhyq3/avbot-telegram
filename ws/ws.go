@@ -137,10 +137,12 @@ func (ws *WSChatServer) OnNewClient(c *websocket.Conn) {
 	msg := &Message{}
 	for {
 		if err := websocket.JSON.Receive(c, msg); err == nil {
-			log.Println("received message ", msg)
-			tgmsg := tgbotapi.NewMessage(ws.chatId, msg.Data.From+": "+msg.Data.Msg)
-			ws.bot.Send(tgmsg)
-			ws.Broadcast(msg)
+			log.Printf("received message type: %d from: %s text: %s", msg.Cmd, msg.Data.From, msg.Data.Msg)
+			go ws.AsyncGetTgMsg(msg, func(tgmsg tgbotapi.Chattable) {
+				ws.bot.Send(tgmsg)
+				ws.Broadcast(msg)
+			})
+
 		}
 	}
 	c.Close()
@@ -151,6 +153,36 @@ func (ws *WSChatServer) OnNewClient(c *websocket.Conn) {
 	ws.clientMutex.Unlock()
 }
 
+func (ws *WSChatServer) AsyncGetTgMsg(msg *Message, cb func(tgbotapi.Chattable)) {
+	var tgmsg tgbotapi.Chattable
+
+	switch msg.Cmd {
+	case 1:
+		tgmsg = tgbotapi.NewMessage(ws.chatId, msg.Data.From+": "+msg.Data.Msg)
+	case 2:
+		data, err := base64.StdEncoding.DecodeString(msg.Data.ImgData)
+		if err != nil {
+			log.Println("image data error")
+		}
+		tgmsg = tgbotapi.NewPhotoUpload(ws.chatId, tgbotapi.FileBytes{
+			Name:  getRandomImageName(msg.Data.ImgType),
+			Bytes: data,
+		})
+	}
+	if tgmsg != nil {
+		cb(tgmsg)
+	}
+}
+
 func getNow() int {
 	return int(time.Now().Unix())
+}
+
+func getRandomImageName(typ string) string {
+	name := strconv.Itoa(getNow())
+	ext, _ := mime.ExtensionsByType(typ)
+	if ext != nil || len(ext) > 0 {
+		return name + ext[0]
+	}
+	return name + ".png"
 }
