@@ -26,9 +26,11 @@ func New(bot *avbot.AVBot, ch, nick string) *JokeHook {
 }
 
 func (h *JokeHook) Process(bot *avbot.AVBot, msg *tgbotapi.Message) (processed bool) {
-	h.SendToIrc(msg.From.FirstName + ":" + msg.Text)
-	if msg.Chat.Type == "group" || msg.Chat.Type == "supergroup" {
-		h.chatId = msg.Chat.ID
+	if msg.From != nil {
+		h.SendToIrc(msg.From.FirstName + ":" + msg.Text)
+		if msg.Chat.Type == "group" || msg.Chat.Type == "supergroup" {
+			h.chatId = msg.Chat.ID
+		}
 	}
 	return false
 }
