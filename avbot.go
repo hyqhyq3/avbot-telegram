@@ -11,12 +11,12 @@ import (
 
 type AVBot struct {
 	*tgbotapi.BotAPI
-	hooks       []MessgaeHook
+	hooks       []MessageHook
 	client      *http.Client
 	groupChatId int64
 }
 
-func (b *AVBot) AddMessageHook(hook MessgaeHook) {
+func (b *AVBot) AddMessageHook(hook MessageHook) {
 	b.hooks = append(b.hooks, hook)
 }
 
@@ -42,7 +42,7 @@ func NewBot(token string, chatId int64, socks5Addr string) *AVBot {
 
 	return &AVBot{
 		BotAPI:      bot,
-		hooks:       make([]MessgaeHook, 0, 0),
+		hooks:       make([]MessageHook, 0, 0),
 		client:      client,
 		groupChatId: chatId,
 	}

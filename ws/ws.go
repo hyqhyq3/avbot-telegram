@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,7 +46,7 @@ type WSChatServer struct {
 	Token       string
 }
 
-func New(bot *avbot.AVBot, token string, port int) avbot.MessgaeHook {
+func New(bot *avbot.AVBot, token string, port int) avbot.MessageHook {
 	wsServer := &websocket.Server{}
 	handler := &WSChatServer{bot: bot}
 	handler.Handle("/", wsServer)
