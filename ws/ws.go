@@ -16,13 +16,19 @@ import (
 	"gopkg.in/telegram-bot-api.v4"
 )
 
+type MessageUser struct {
+	Name string `json:"name"`
+	ID   int    `json:"id"`
+}
+
 type MessageData struct {
-	Timestamp string `json:"timestamp"`
-	Msg       string `json:"msg"`
-	From      string `json:"from"`
-	ImgType   string `json:"img_type"`
-	ImgData   string `json:"img_data"`
-	Caption   string `json:"caption"`
+	Timestamp string       `json:"timestamp"`
+	Msg       string       `json:"msg"`
+	From      string       `json:"from"`
+	ImgType   string       `json:"img_type"`
+	ImgData   string       `json:"img_data"`
+	Caption   string       `json:"caption"`
+	User      *MessageUser `json:"user"`
 }
 
 type Message struct {
@@ -31,7 +37,7 @@ type Message struct {
 }
 
 type WSChatServer struct {
-	websocket.Server
+	http.ServeMux
 	clients     map[int]*websocket.Conn
 	clientMutex sync.Mutex
 	bot         *avbot.AVBot
@@ -40,16 +46,70 @@ type WSChatServer struct {
 }
 
 func New(bot *avbot.AVBot, token string, port int) avbot.MessgaeHook {
+	wsServer := &websocket.Server{}
 	handler := &WSChatServer{bot: bot}
+	handler.Handle("/", wsServer)
+	handler.HandleFunc("/avbot/face", handler.GetFace)
 	handler.index = 1
 	handler.clients = make(map[int]*websocket.Conn)
-	handler.Handler = handler.OnNewClient
+	wsServer.Handler = handler.OnNewClient
 	handler.Token = token
 	go func() {
 		log.Printf("listening websocket on %s\n", port)
 		http.ListenAndServe(":"+strconv.Itoa(port), handler)
 	}()
 	return handler
+}
+
+func (ws *WSChatServer) GetFace(w http.ResponseWriter, r *http.Request) {
+	c, rw, _ := w.(http.Hijacker).Hijack()
+
+	go func() {
+		defer c.Close()
+
+		r.ParseForm()
+		if len(r.Form["uid"]) == 0 {
+			return
+		}
+		uid, _ := strconv.Atoi(r.Form["uid"][0])
+		photos, err := ws.bot.GetUserProfilePhotos(tgbotapi.UserProfilePhotosConfig{UserID: uid, Offset: 0, Limit: 1})
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		if photos.TotalCount == 0 {
+			log.Println("no photo")
+			return
+		}
+		photoSize := photos.Photos[0][0]
+		file, err := ws.bot.GetFile(tgbotapi.FileConfig{FileID: photoSize.FileID})
+		if err != nil {
+			log.Println("unable to get file")
+			return
+		}
+		url, err := ws.bot.GetFileDirectURL(photoSize.FileID)
+		if err != nil {
+			log.Println("cannot get download link")
+			return
+		}
+		resp, err := ws.bot.Client.Get(url)
+		if err != nil {
+			log.Println("cannot download photo")
+			return
+		}
+		data, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Println("failed to download photo")
+			return
+		}
+
+		rw.WriteString("HTTP/1.1 200 OK\r\n")
+		rw.WriteString("Content-Type: " + mime.TypeByExtension(filepath.Ext(file.FilePath)) + "\r\n")
+		rw.WriteString("Content-Length: " + strconv.Itoa(len(data)) + "\r\n")
+		rw.WriteString("\r\n")
+		rw.Write(data)
+		rw.Flush()
+	}()
 }
 
 func (ws *WSChatServer) Process(bot *avbot.AVBot, msg *tgbotapi.Message) bool {
@@ -64,6 +124,12 @@ func (ws *WSChatServer) Process(bot *avbot.AVBot, msg *tgbotapi.Message) bool {
 
 func (ws *WSChatServer) AsyncGetWsMsg(msg *tgbotapi.Message, cb func(wsMsg *Message)) {
 	var wsMsg *Message
+	var usr *MessageUser
+
+	if msg.From != nil {
+		usr = &MessageUser{ID: msg.From.ID, Name: msg.From.FirstName}
+	}
+
 	ts := strconv.Itoa(getNow())
 	switch {
 	case msg.Text != "":
@@ -73,6 +139,7 @@ func (ws *WSChatServer) AsyncGetWsMsg(msg *tgbotapi.Message, cb func(wsMsg *Mess
 				Timestamp: ts,
 				Msg:       msg.Text,
 				From:      msg.From.FirstName,
+				User:      usr,
 			},
 		}
 	case msg.Photo != nil && len(*msg.Photo) > 0:
@@ -102,6 +169,7 @@ func (ws *WSChatServer) AsyncGetWsMsg(msg *tgbotapi.Message, cb func(wsMsg *Mess
 				ImgData: imgData,
 				From:    msg.From.FirstName,
 				Caption: msg.Caption,
+				User:    usr,
 			},
 		}
 	}
