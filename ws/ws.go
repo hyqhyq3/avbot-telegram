@@ -23,6 +23,14 @@ import (
 	"gopkg.in/telegram-bot-api.v4"
 )
 
+type MessageType int
+
+const (
+	MessageType_Text MessageType = iota + 1
+	MessageType_Image
+	MessageType_Video
+)
+
 type MessageUser struct {
 	Name string `json:"name"`
 	ID   int    `json:"id"`
@@ -34,12 +42,14 @@ type MessageData struct {
 	From      string       `json:"from"`
 	ImgType   string       `json:"img_type"`
 	ImgData   string       `json:"img_data"`
+	VideoType string       `json:"video_type"`
+	VideoData string       `json:"video_data"`
 	Caption   string       `json:"caption"`
 	User      *MessageUser `json:"user"`
 }
 
 type Message struct {
-	Cmd  int         `json:"cmd"`
+	Cmd  MessageType `json:"cmd"`
 	Data MessageData `json:"data"`
 }
 
@@ -173,7 +183,7 @@ func (ws *WSChatServer) AsyncGetWsMsg(msg *tgbotapi.Message, cb func(wsMsg *Mess
 	switch {
 	case msg.Text != "":
 		wsMsg = &Message{
-			Cmd: 1,
+			Cmd: MessageType_Text,
 			Data: MessageData{
 				Timestamp: ts,
 				Msg:       msg.Text,
@@ -181,7 +191,8 @@ func (ws *WSChatServer) AsyncGetWsMsg(msg *tgbotapi.Message, cb func(wsMsg *Mess
 				User:      usr,
 			},
 		}
-	case (msg.Photo != nil && len(*msg.Photo) > 0) || msg.Sticker != nil:
+	case (msg.Photo != nil && len(*msg.Photo) > 0) || msg.Sticker != nil || msg.Document != nil:
+		cmdType := MessageType_Image
 		var fileID string
 		if msg.Photo != nil && len(*msg.Photo) > 0 {
 			fileID = (*msg.Photo)[0].FileID
@@ -191,8 +202,11 @@ func (ws *WSChatServer) AsyncGetWsMsg(msg *tgbotapi.Message, cb func(wsMsg *Mess
 			} else {
 				fileID = msg.Sticker.FileID
 			}
+		} else if msg.Document != nil {
+			fileID = msg.Document.FileID
+			cmdType = MessageType_Video
 		}
-		data, imgType, err := ws.Download(fileID)
+		data, fileType, err := ws.Download(fileID)
 		if err != nil {
 			log.Println(err)
 			return
@@ -204,20 +218,25 @@ func (ws *WSChatServer) AsyncGetWsMsg(msg *tgbotapi.Message, cb func(wsMsg *Mess
 			buf := &bytes.Buffer{}
 			png.Encode(buf, img)
 			data = buf.Bytes()
-			imgType = "image/png"
+			fileType = "image/png"
 		}
 
-		imgData := base64.StdEncoding.EncodeToString(data)
+		fileData := base64.StdEncoding.EncodeToString(data)
 		wsMsg = &Message{
-			Cmd: 2,
+			Cmd: cmdType,
 			Data: MessageData{
 				Timestamp: ts,
-				ImgType:   imgType,
-				ImgData:   imgData,
 				From:      msg.From.FirstName,
 				Caption:   msg.Caption,
 				User:      usr,
 			},
+		}
+		if cmdType == MessageType_Image {
+			wsMsg.Data.ImgData = fileData
+			wsMsg.Data.ImgType = fileType
+		} else if cmdType == MessageType_Video {
+			wsMsg.Data.VideoData = fileData
+			wsMsg.Data.VideoType = fileType
 		}
 	}
 
@@ -277,9 +296,9 @@ func (ws *WSChatServer) AsyncGetTgMsg(msg *Message, cb func(tgbotapi.Chattable))
 	chatId := ws.bot.GetGroupChatId()
 
 	switch msg.Cmd {
-	case 1:
+	case MessageType_Text:
 		tgmsg = tgbotapi.NewMessage(chatId, msg.Data.From+": "+msg.Data.Msg)
-	case 2:
+	case MessageType_Image:
 		data, err := base64.StdEncoding.DecodeString(msg.Data.ImgData)
 		if err != nil {
 			log.Println("image data error")
