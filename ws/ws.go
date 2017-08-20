@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"mime"
+	"net"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -83,12 +84,21 @@ func (ws *WSChatServer) GetFace(w http.ResponseWriter, r *http.Request) {
 			log.Println("no photo")
 			return
 		}
+
 		photoSize := photos.Photos[0][0]
 		file, err := ws.bot.GetFile(tgbotapi.FileConfig{FileID: photoSize.FileID})
 		if err != nil {
 			log.Println("unable to get file")
 			return
 		}
+
+		if r.Header.Get("If-None-Match") == file.FileID {
+			rw.WriteString("HTTP/1.1 304 Not Modified\r\n")
+			rw.WriteString("\r\n")
+			rw.Flush()
+			return
+		}
+
 		url, err := ws.bot.GetFileDirectURL(photoSize.FileID)
 		if err != nil {
 			log.Println("cannot get download link")
@@ -106,6 +116,8 @@ func (ws *WSChatServer) GetFace(w http.ResponseWriter, r *http.Request) {
 		}
 
 		rw.WriteString("HTTP/1.1 200 OK\r\n")
+		rw.WriteString("Cache-Control: max-age=2592000\r\n")
+		rw.WriteString("ETag: " + file.FileID + "\r\n")
 		rw.WriteString("Content-Type: " + mime.TypeByExtension(filepath.Ext(file.FilePath)) + "\r\n")
 		rw.WriteString("Content-Length: " + strconv.Itoa(len(data)) + "\r\n")
 		rw.WriteString("\r\n")
@@ -201,6 +213,7 @@ func (ws *WSChatServer) OnNewClient(c *websocket.Conn) {
 
 	msg := &Message{}
 	for {
+		c.SetReadDeadline(time.Now().Add(time.Second * 60))
 		err := websocket.JSON.Receive(c, msg)
 		if err == nil {
 			log.Printf("received message type: %d from: %s text: %s", msg.Cmd, msg.Data.From, msg.Data.Msg)
@@ -210,6 +223,9 @@ func (ws *WSChatServer) OnNewClient(c *websocket.Conn) {
 			})
 
 		} else {
+			if e := err.(net.Error); e != nil && e.Temporary() {
+				continue
+			}
 			break
 		}
 	}
