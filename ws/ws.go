@@ -49,7 +49,7 @@ func New(bot *avbot.AVBot, token string, port int) avbot.MessgaeHook {
 	wsServer := &websocket.Server{}
 	handler := &WSChatServer{bot: bot}
 	handler.Handle("/", wsServer)
-	handler.HandleFunc("/avbot/face", handler.GetFace)
+	handler.HandleFunc("/avbot/face/", handler.GetFace)
 	handler.index = 1
 	handler.clients = make(map[int]*websocket.Conn)
 	wsServer.Handler = handler.OnNewClient
@@ -67,11 +67,12 @@ func (ws *WSChatServer) GetFace(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		defer c.Close()
 
-		r.ParseForm()
-		if len(r.Form["uid"]) == 0 {
+		str := strings.TrimPrefix(r.RequestURI, "/avbot/face/")
+		uid, err := strconv.Atoi(str)
+		if err != nil {
+			log.Println(err)
 			return
 		}
-		uid, _ := strconv.Atoi(r.Form["uid"][0])
 		photos, err := ws.bot.GetUserProfilePhotos(tgbotapi.UserProfilePhotosConfig{UserID: uid, Offset: 0, Limit: 1})
 		if err != nil {
 			log.Println(err)
