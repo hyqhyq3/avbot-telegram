@@ -256,7 +256,7 @@ func (ws *WSChatServer) OnNewClient(c *websocket.Conn) {
 			})
 
 		} else {
-			if e := err.(net.Error); e != nil {
+			if e, ok := err.(net.Error); ok {
 				if e.Temporary() {
 					continue
 				}
