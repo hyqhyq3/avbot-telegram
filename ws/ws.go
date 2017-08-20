@@ -1,7 +1,10 @@
 package ws
 
 import (
+	"bytes"
 	"encoding/base64"
+	"image"
+	"image/png"
 	"io/ioutil"
 	"log"
 	"mime"
@@ -12,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	_ "golang.org/x/image/webp"
 
 	"github.com/hyqhyq3/avbot-telegram"
 	"golang.org/x/net/websocket"
@@ -176,36 +181,30 @@ func (ws *WSChatServer) AsyncGetWsMsg(msg *tgbotapi.Message, cb func(wsMsg *Mess
 				User:      usr,
 			},
 		}
-	case msg.Photo != nil && len(*msg.Photo) > 0:
-		data, imgType, err := ws.Download((*msg.Photo)[0].FileID)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		imgData := base64.StdEncoding.EncodeToString(data)
-		wsMsg = &Message{
-			Cmd: 2,
-			Data: MessageData{
-				Timestamp: ts,
-				ImgType:   imgType,
-				ImgData:   imgData,
-				From:      msg.From.FirstName,
-				Caption:   msg.Caption,
-				User:      usr,
-			},
-		}
-	case msg.Sticker != nil:
+	case (msg.Photo != nil && len(*msg.Photo) > 0) || msg.Sticker != nil:
 		var fileID string
-		if msg.Sticker.Thumbnail != nil {
-			fileID = msg.Sticker.Thumbnail.FileID
-		} else {
-			fileID = msg.Sticker.FileID
+		if msg.Photo != nil && len(*msg.Photo) > 0 {
+			fileID = (*msg.Photo)[0].FileID
+		} else if msg.Sticker != nil {
+			if msg.Sticker.Thumbnail != nil {
+				fileID = msg.Sticker.Thumbnail.FileID
+			} else {
+				fileID = msg.Sticker.FileID
+			}
 		}
 		data, imgType, err := ws.Download(fileID)
 		if err != nil {
 			log.Println(err)
 			return
+		}
+
+		img, fileType, err := image.Decode(bytes.NewReader(data))
+
+		if err == nil && fileType == "webp" {
+			buf := &bytes.Buffer{}
+			png.Encode(buf, img)
+			data = buf.Bytes()
+			imgType = "image/png"
 		}
 
 		imgData := base64.StdEncoding.EncodeToString(data)
