@@ -136,6 +136,26 @@ func (ws *WSChatServer) Process(bot *avbot.AVBot, msg *tgbotapi.Message) bool {
 	return false
 }
 
+func (ws *WSChatServer) Download(fileID string) (data []byte, typ string, err error) {
+	file, err := ws.bot.GetFile(tgbotapi.FileConfig{FileID: fileID})
+	if err != nil {
+		return
+	}
+	link := file.Link(ws.Token)
+
+	resp, err := ws.bot.Client.Get(link)
+	if err != nil {
+		return
+	}
+	data, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+
+	typ = mime.TypeByExtension(filepath.Ext(file.FilePath))
+	return
+}
+
 func (ws *WSChatServer) AsyncGetWsMsg(msg *tgbotapi.Message, cb func(wsMsg *Message)) {
 	var wsMsg *Message
 	var usr *MessageUser
@@ -157,33 +177,47 @@ func (ws *WSChatServer) AsyncGetWsMsg(msg *tgbotapi.Message, cb func(wsMsg *Mess
 			},
 		}
 	case msg.Photo != nil && len(*msg.Photo) > 0:
-		file, err := ws.bot.GetFile(tgbotapi.FileConfig{FileID: (*msg.Photo)[0].FileID})
+		data, imgType, err := ws.Download((*msg.Photo)[0].FileID)
 		if err != nil {
 			log.Println(err)
 			return
 		}
-		link := file.Link(ws.Token)
 
-		resp, err := ws.bot.Client.Get(link)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		data, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			log.Println(err)
-			return
-		}
 		imgData := base64.StdEncoding.EncodeToString(data)
-		imgType := mime.TypeByExtension(filepath.Ext(file.FilePath))
 		wsMsg = &Message{
 			Cmd: 2,
 			Data: MessageData{
-				ImgType: imgType,
-				ImgData: imgData,
-				From:    msg.From.FirstName,
-				Caption: msg.Caption,
-				User:    usr,
+				Timestamp: ts,
+				ImgType:   imgType,
+				ImgData:   imgData,
+				From:      msg.From.FirstName,
+				Caption:   msg.Caption,
+				User:      usr,
+			},
+		}
+	case msg.Sticker != nil:
+		var fileID string
+		if msg.Sticker.Thumbnail != nil {
+			fileID = msg.Sticker.Thumbnail.FileID
+		} else {
+			fileID = msg.Sticker.FileID
+		}
+		data, imgType, err := ws.Download(fileID)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		imgData := base64.StdEncoding.EncodeToString(data)
+		wsMsg = &Message{
+			Cmd: 2,
+			Data: MessageData{
+				Timestamp: ts,
+				ImgType:   imgType,
+				ImgData:   imgData,
+				From:      msg.From.FirstName,
+				Caption:   msg.Caption,
+				User:      usr,
 			},
 		}
 	}
@@ -223,8 +257,10 @@ func (ws *WSChatServer) OnNewClient(c *websocket.Conn) {
 			})
 
 		} else {
-			if e := err.(net.Error); e != nil && e.Temporary() {
-				continue
+			if e := err.(net.Error); e != nil {
+				if e.Temporary() {
+					continue
+				}
 			}
 			break
 		}
