@@ -62,7 +62,9 @@ func (b *AVBot) Run() {
 	}
 
 	for update := range updates {
-		b.onMessage(update.Message)
+		if update.Message != nil {
+			b.onMessage(update.Message)
+		}
 	}
 }
 
