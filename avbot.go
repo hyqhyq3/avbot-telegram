@@ -4,6 +4,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"os/signal"
 
 	"golang.org/x/net/proxy"
 	tgbotapi "gopkg.in/telegram-bot-api.v4"
@@ -14,6 +16,7 @@ type AVBot struct {
 	hooks       []MessageHook
 	client      *http.Client
 	groupChatId int64
+	closeCh     chan int
 }
 
 func (b *AVBot) AddMessageHook(hook MessageHook) {
@@ -45,10 +48,14 @@ func NewBot(token string, chatId int64, socks5Addr string) *AVBot {
 		hooks:       make([]MessageHook, 0, 0),
 		client:      client,
 		groupChatId: chatId,
+		closeCh:     make(chan int),
 	}
 }
 
 func (b *AVBot) Run() {
+
+	go b.HandleSignal()
+
 	b.Debug = true
 
 	log.Printf("Authorized on account %s", b.Self.UserName)
@@ -60,12 +67,23 @@ func (b *AVBot) Run() {
 	if err != nil {
 		panic(err)
 	}
-
-	for update := range updates {
-		if update.Message != nil {
-			b.onMessage(update.Message)
+	for {
+		select {
+		case update := <-updates:
+			if update.Message != nil {
+				b.onMessage(update.Message)
+			}
+		case <-b.closeCh:
+			b.Stop()
 		}
 	}
+}
+
+func (b *AVBot) HandleSignal() {
+	ch := make(chan os.Signal)
+	signal.Notify(ch, os.Interrupt)
+	<-ch
+	b.closeCh <- 1
 }
 
 func (b *AVBot) onMessage(msg *tgbotapi.Message) {
@@ -83,4 +101,12 @@ func (b *AVBot) GetBotApi() *tgbotapi.BotAPI {
 
 func (b *AVBot) GetGroupChatId() int64 {
 	return b.groupChatId
+}
+
+func (b *AVBot) Stop() {
+	for _, v := range b.hooks {
+		if o, ok := v.(Stoppable); ok {
+			o.Stop()
+		}
+	}
 }

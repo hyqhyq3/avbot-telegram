@@ -8,6 +8,7 @@ import (
 	"log"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	avbot "github.com/hyqhyq3/avbot-telegram"
@@ -18,6 +19,8 @@ import (
 type StatHook struct {
 	filename string
 	Groups   map[int64]*Group
+	Changed  bool
+	closeCh  chan int
 }
 
 func New(filename string) (h *StatHook) {
@@ -40,16 +43,29 @@ func New(filename string) (h *StatHook) {
 	}
 
 	h.Groups = store.Groups
+	h.closeCh = make(chan int)
 
-	fmt.Println(h)
+	go h.StartLoop()
 
 	return
+}
+
+func (h *StatHook) StartLoop() {
+	for {
+		select {
+		case <-time.After(time.Second * 60):
+			h.Save(false)
+		case <-h.closeCh:
+			h.Save(true)
+			break
+		}
+	}
 }
 
 func (h *StatHook) Process(bot *avbot.AVBot, msg *tgbotapi.Message) (processed bool) {
 	if msg != nil {
 		h.Inc(msg.Chat, msg.From)
-		h.Save()
+		h.Changed = true
 	}
 	cmd := strings.Split(msg.Text, " ")
 	if cmd[0] == "/stat" || cmd[0] == "/stat@"+bot.Self.UserName {
@@ -111,7 +127,10 @@ func (h *StatHook) Inc(chat *tgbotapi.Chat, user *tgbotapi.User) {
 	h.Groups[chatid].Users[uid].Count++
 }
 
-func (h *StatHook) Save() {
+func (h *StatHook) Save(force bool) {
+	if !h.Changed && !force {
+		return
+	}
 	store := &Store{}
 	store.Groups = h.Groups
 
