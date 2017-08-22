@@ -51,13 +51,13 @@ func New(filename string) (h *StatHook) {
 }
 
 func (h *StatHook) StartLoop() {
+mainLoop:
 	for {
 		select {
 		case <-time.After(time.Second * 60):
 			h.Save(false)
 		case <-h.closeCh:
-			h.Save(true)
-			break
+			break mainLoop
 		}
 	}
 }
@@ -143,5 +143,12 @@ func (h *StatHook) Save(force bool) {
 	err = ioutil.WriteFile(h.filename, b, 0755)
 	if err != nil {
 		log.Println(err)
+		return
 	}
+	log.Println("save stat data")
+}
+
+func (h *StatHook) Stop() {
+	h.closeCh <- 1
+	h.Save(true)
 }

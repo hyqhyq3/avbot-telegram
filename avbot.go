@@ -67,6 +67,7 @@ func (b *AVBot) Run() {
 	if err != nil {
 		panic(err)
 	}
+mainLoop:
 	for {
 		select {
 		case update := <-updates:
@@ -75,15 +76,17 @@ func (b *AVBot) Run() {
 			}
 		case <-b.closeCh:
 			b.Stop()
+			break mainLoop
 		}
 	}
 }
 
 func (b *AVBot) HandleSignal() {
-	ch := make(chan os.Signal)
+	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, os.Interrupt)
 	<-ch
 	b.closeCh <- 1
+	log.Println("received interrupt signal")
 }
 
 func (b *AVBot) onMessage(msg *tgbotapi.Message) {
