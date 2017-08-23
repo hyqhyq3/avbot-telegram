@@ -3,9 +3,10 @@ package chatlog;
 
 enum MessageType
 {
-    TEXT        = 0;
-    IMAGE       = 1;
-    VIDEO       = 2;
+    UNKNOWN     = 0;
+    TEXT        = 1;
+    IMAGE       = 2;
+    VIDEO       = 3;
 };
 
 message ChatLog
@@ -15,4 +16,5 @@ message ChatLog
     string          Content     = 3;
     string          From        = 4;
     string          FileID      = 5;
+    int64           Timestamp   = 6;
 };

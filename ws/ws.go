@@ -3,6 +3,7 @@ package ws
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"image"
 	"image/png"
 	"io/ioutil"
@@ -16,8 +17,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hyqhyq3/avbot-telegram/chatlog"
+
 	_ "golang.org/x/image/webp"
 
+	"github.com/gorilla/mux"
 	"github.com/hyqhyq3/avbot-telegram"
 	"golang.org/x/net/websocket"
 	"gopkg.in/telegram-bot-api.v4"
@@ -65,8 +69,13 @@ type WSChatServer struct {
 func New(bot *avbot.AVBot, token string, port int) avbot.MessageHook {
 	wsServer := &websocket.Server{}
 	handler := &WSChatServer{bot: bot}
-	handler.Handle("/", wsServer)
-	handler.HandleFunc("/avbot/face/", handler.GetFace)
+
+	r := mux.NewRouter()
+	r.Handle("/", wsServer)
+	r.HandleFunc("/avbot/face/", handler.GetFace)
+	r.HandleFunc("/avbot/history/{from}-{to}", handler.GetHistory)
+	handler.Handle("/", r)
+
 	handler.index = 1
 	handler.clients = make(map[int]*websocket.Conn)
 	wsServer.Handler = handler.OnNewClient
@@ -139,6 +148,24 @@ func (ws *WSChatServer) GetFace(w http.ResponseWriter, r *http.Request) {
 		rw.Write(data)
 		rw.Flush()
 	}()
+}
+
+func (ws *WSChatServer) GetHistory(w http.ResponseWriter, r *http.Request) {
+	from, _ := strconv.ParseUint(mux.Vars(r)["from"], 10, 64)
+	to, _ := strconv.ParseUint(mux.Vars(r)["to"], 10, 64)
+
+	msgs := make([]*Message, 0, 100)
+	for _, msg := range chatlog.GetInstance().Get(from, to) {
+		wsMsg := &Message{}
+		wsMsg.Cmd = MessageType(msg.Type)
+		wsMsg.Data.Msg = msg.Content
+		wsMsg.Data.From = msg.From
+		wsMsg.Data.Timestamp = strconv.FormatInt(msg.Timestamp, 10)
+		msgs = append(msgs, wsMsg)
+	}
+
+	data, _ := json.Marshal(msgs)
+	w.Write(data)
 }
 
 func (ws *WSChatServer) Process(bot *avbot.AVBot, msg *tgbotapi.Message) bool {
