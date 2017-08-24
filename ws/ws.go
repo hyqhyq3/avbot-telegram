@@ -150,6 +150,24 @@ func (ws *WSChatServer) GetFace(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
+func chatLogToWsMsg(msg *chatlog.ChatLog) *Message {
+	wsMsg := &Message{}
+	wsMsg.Cmd = MessageType(msg.Type)
+	wsMsg.Data.Msg = msg.Content
+	wsMsg.Data.From = msg.From
+	wsMsg.Data.Timestamp = strconv.FormatInt(msg.Timestamp, 10)
+	return wsMsg
+}
+
+func chatLogToWsMsgArr(msgs []*chatlog.ChatLog) []*Message {
+	arr := make([]*Message, len(msgs))
+
+	for k, v := range msgs {
+		arr[k] = chatLogToWsMsg(v)
+	}
+	return arr
+}
+
 func (ws *WSChatServer) GetHistory(w http.ResponseWriter, r *http.Request) {
 	from, _ := strconv.ParseUint(mux.Vars(r)["from"], 10, 64)
 	to, _ := strconv.ParseUint(mux.Vars(r)["to"], 10, 64)
@@ -289,6 +307,12 @@ func (ws *WSChatServer) OnNewClient(c *websocket.Conn) {
 	ws.clients[index] = c
 	log.Println("new client")
 	ws.clientMutex.Unlock()
+
+	chatLog := chatlog.GetInstance().Last(10)
+
+	for _, v := range chatLogToWsMsgArr(chatLog) {
+		websocket.JSON.Send(c, v)
+	}
 
 	msg := &Message{}
 	for {

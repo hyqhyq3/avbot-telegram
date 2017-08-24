@@ -103,6 +103,16 @@ func (h *ChatLogHook) Get(from, to uint64) []*ChatLog {
 	return logs
 }
 
+func (h *ChatLogHook) Last(num uint64) []*ChatLog {
+	var from uint64
+	if h.index > num {
+		from = h.index - num
+	} else {
+		from = 0
+	}
+	return h.Get(from, h.index)
+}
+
 func (h *ChatLogHook) Process(bot *avbot.AVBot, msg *tgbotapi.Message) (processed bool) {
 
 	switch {
