@@ -326,6 +326,15 @@ func (ws *WSChatServer) OnNewClient(c *websocket.Conn) {
 			go ws.AsyncGetTgMsg(msg, func(tgmsg tgbotapi.Chattable) {
 				ws.bot.Send(tgmsg)
 				ws.Broadcast(msg)
+
+				chatLog := &chatlog.ChatLog{}
+				chatLog.Content = msg.Data.Msg
+				chatLog.Type = chatlog.MessageType(msg.Cmd)
+				chatLog.From = msg.Data.From
+				if msg.Data.User != nil {
+					chatLog.UID = int64(msg.Data.User.ID)
+				}
+				chatlog.GetInstance().AddLog(chatLog)
 			})
 
 		} else {
