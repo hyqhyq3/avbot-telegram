@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -72,7 +71,7 @@ func New(bot *avbot.AVBot, token string, port int) avbot.MessageHook {
 
 	r := mux.NewRouter()
 	r.Handle("/", wsServer)
-	r.HandleFunc("/avbot/face/", handler.GetFace)
+	r.HandleFunc("/avbot/face/{uid}", handler.GetFace)
 	r.HandleFunc("/avbot/history/{from}-{to}", handler.GetHistory)
 	handler.Handle("/", r)
 
@@ -93,8 +92,7 @@ func (ws *WSChatServer) GetFace(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		defer c.Close()
 
-		str := strings.TrimPrefix(r.RequestURI, "/avbot/face/")
-		uid, err := strconv.Atoi(str)
+		uid, err := strconv.Atoi(mux.Vars(r)["uid"])
 		if err != nil {
 			log.Println(err)
 			return
