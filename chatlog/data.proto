@@ -17,4 +17,5 @@ message ChatLog
     string          From        = 4;
     string          FileID      = 5;
     int64           Timestamp   = 6;
+    int64           UID         = 7;
 };

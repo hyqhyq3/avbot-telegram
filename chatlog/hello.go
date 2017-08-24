@@ -122,6 +122,7 @@ func (h *ChatLogHook) Process(bot *avbot.AVBot, msg *tgbotapi.Message) (processe
 			From:      msg.From.FirstName,
 			Type:      MessageType_TEXT,
 			Timestamp: msg.Time().Unix(),
+			UID:       int64(msg.From.ID),
 		}
 
 		h.AddLog(log)
