@@ -156,7 +156,9 @@ func chatLogToWsMsg(msg *chatlog.ChatLog) *Message {
 	wsMsg.Data.Msg = msg.Content
 	wsMsg.Data.From = msg.From
 	wsMsg.Data.Timestamp = strconv.FormatInt(msg.Timestamp, 10)
-	wsMsg.Data.User = &MessageUser{Name: msg.From, ID: int(msg.UID)}
+	if msg.UID != 0 {
+		wsMsg.Data.User = &MessageUser{Name: msg.From, ID: int(msg.UID)}
+	}
 	return wsMsg
 }
 
