@@ -125,9 +125,14 @@ mainLoop:
 
 func (h *Telegram) Process(bot *avbot.AVBot, msg *avbot.MessageInfo) (processed bool) {
 	log.Println("send message to telegram")
+
+	prefix := ""
+	if msg.From != "" {
+		prefix = msg.From + ": "
+	}
 	switch msg.Type {
 	case data.MessageType_TEXT:
-		h.Send(tgbotapi.NewMessage(h.chatId, msg.From+": "+msg.Content))
+		h.Send(tgbotapi.NewMessage(h.chatId, prefix+msg.Content))
 	case data.MessageType_IMAGE:
 		log.Println("send image")
 		var tgmsg tgbotapi.Chattable
@@ -136,7 +141,7 @@ func (h *Telegram) Process(bot *avbot.AVBot, msg *avbot.MessageInfo) (processed 
 				log.Println("upload image")
 				name := getRandomImageName(b.Type)
 				photo := tgbotapi.NewPhotoUpload(h.chatId, tgbotapi.FileBytes{Bytes: b.Data, Name: name})
-				photo.Caption = msg.Content
+				photo.Caption = prefix + msg.Content
 				tgmsg = photo
 				tgmsg2, err := h.Send(tgmsg)
 				if err != nil {
