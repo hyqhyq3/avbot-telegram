@@ -12,7 +12,6 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	avbot "github.com/hyqhyq3/avbot-telegram"
-	"github.com/hyqhyq3/avbot-telegram/data"
 )
 
 type StatHook struct {
@@ -80,12 +79,8 @@ func (h *StatHook) Process(bot *avbot.AVBot, msg *avbot.MessageInfo) (processed 
 	}
 	cmd := strings.Split(msg.Content, " ")
 	if cmd[0] == "/stat" {
-		mymsg := &avbot.MessageInfo{
-			Message: &data.Message{
-				Content: h.GetStat(),
-			},
-			Channel: h,
-		}
+		mymsg := avbot.NewTextMessage(h, h.GetStat())
+
 		h.sendCh <- mymsg
 	}
 	return false
