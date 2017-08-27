@@ -49,3 +49,15 @@ func NewVideoMessage(c Component, fileID string) *MessageInfo {
 		Channel: c,
 	}
 }
+
+func NewChatMemberMessage(c Component) *MessageInfo {
+	ts := time.Now().Unix()
+
+	return &MessageInfo{
+		Message: &data.Message{
+			Type:      data.MessageType_NEW_MEMBER,
+			Timestamp: ts,
+		},
+		Channel: c,
+	}
+}

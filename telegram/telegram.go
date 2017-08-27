@@ -162,6 +162,8 @@ func (h *Telegram) Forward(msg *tgbotapi.Message) {
 		botMsg = avbot.NewImageMessage(h, h.GetPhotoFileID(msg.Photo))
 	case msg.Document != nil:
 		botMsg = avbot.NewVideoMessage(h, h.GetDocumentFileID(msg.Document))
+	case msg.NewChatMember != nil:
+		botMsg = avbot.NewChatMemberMessage(h)
 	}
 	if botMsg != nil {
 		botMsg.From = msg.From.UserName
