@@ -127,7 +127,7 @@ func (h *Telegram) Process(bot *avbot.AVBot, msg *avbot.MessageInfo) (processed 
 	log.Println("send message to telegram")
 	switch msg.Type {
 	case data.MessageType_TEXT:
-		h.Send(tgbotapi.NewMessage(h.chatId, msg.Content))
+		h.Send(tgbotapi.NewMessage(h.chatId, msg.From+": "+msg.Content))
 	case data.MessageType_IMAGE:
 		log.Println("send image")
 		var tgmsg tgbotapi.Chattable
