@@ -76,13 +76,13 @@ func (h *StatHook) Process(bot *avbot.AVBot, msg *avbot.MessageInfo) (processed 
 			h.Inc(msg.From)
 			h.Changed = true
 		}
-		cmd := strings.Split(msg.Content, " ")
-		cmd = strings.Split(cmd[0], "@")
-		if cmd[0] == "/stat" {
-			mymsg := avbot.NewTextMessage(h, h.GetStat())
+	}
+	cmd := strings.Split(msg.Content, " ")
+	cmd = strings.Split(cmd[0], "@")
+	if cmd[0] == "/stat" {
+		mymsg := avbot.NewTextMessage(h, h.GetStat())
 
-			bot.SendMessage(mymsg)
-		}
+		bot.SendMessage(mymsg)
 	}
 	return false
 }
