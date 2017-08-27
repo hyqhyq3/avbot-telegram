@@ -12,42 +12,49 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	avbot "github.com/hyqhyq3/avbot-telegram"
-
-	"gopkg.in/telegram-bot-api.v4"
+	"github.com/hyqhyq3/avbot-telegram/data"
 )
 
 type StatHook struct {
 	filename string
-	Groups   map[int64]*Group
 	Changed  bool
 	closeCh  chan int
+	store    *Store
+	sendCh   chan<- *avbot.MessageInfo
 }
 
 func New(filename string) (h *StatHook) {
 
 	h = &StatHook{}
-	h.Groups = make(map[int64]*Group)
 	h.filename = filename
 
 	b, err := ioutil.ReadFile(filename)
 	if err != nil {
-		log.Println(err)
+		log.Fatal(err)
 		return
 	}
 
 	store := &Store{}
 	err = proto.Unmarshal(b, store)
 	if err != nil {
-		log.Println(err)
+		log.Fatal(err)
 		return
 	}
 
-	h.Groups = store.Groups
+	if store.Users == nil {
+		store.Users = make(map[string]*User)
+	}
+
+	h.store = store
 	h.closeCh = make(chan int)
 
 	go h.StartLoop()
 
 	return
+}
+
+func (h *StatHook) GetName() string {
+	return "Stat"
 }
 
 func (h *StatHook) StartLoop() {
@@ -62,15 +69,24 @@ mainLoop:
 	}
 }
 
-func (h *StatHook) Process(bot *avbot.AVBot, msg *tgbotapi.Message) (processed bool) {
+func (h *StatHook) SetSendMessageChannel(ch chan<- *avbot.MessageInfo) {
+	h.sendCh = ch
+}
+
+func (h *StatHook) Process(bot *avbot.AVBot, msg *avbot.MessageInfo) (processed bool) {
 	if msg != nil {
-		h.Inc(msg.Chat, msg.From)
+		h.Inc(msg.From)
 		h.Changed = true
 	}
-	cmd := strings.Split(msg.Text, " ")
-	if cmd[0] == "/stat" || cmd[0] == "/stat@"+bot.Self.UserName {
-		mymsg := tgbotapi.NewMessage(msg.Chat.ID, h.GetStat(msg.Chat.ID))
-		bot.Send(mymsg)
+	cmd := strings.Split(msg.Content, " ")
+	if cmd[0] == "/stat" {
+		mymsg := &avbot.MessageInfo{
+			Message: &data.Message{
+				Content: h.GetStat(),
+			},
+			Channel: h,
+		}
+		h.sendCh <- mymsg
 	}
 	return false
 }
@@ -98,43 +114,34 @@ func min(a, b int) int {
 	return b
 }
 
-func (h *StatHook) GetStat(id int64) string {
+func (h *StatHook) GetStat() string {
 	data := make([]*User, 0)
-	for _, v := range h.Groups[id].Users {
+	for _, v := range h.store.Users {
 		data = append(data, v)
 	}
 	sort.Sort(Users(data))
 
 	var str = ""
 	for i := 0; i < min(10, len(data)); i++ {
-		str = str + fmt.Sprintf("%s %s: %d\n", data[i].FirstName, data[i].LastName, data[i].Count)
+		str = str + fmt.Sprintf("%s %s: %d\n", data[i].UserName, data[i].Count)
 	}
 	return str
 }
 
-func (h *StatHook) Inc(chat *tgbotapi.Chat, user *tgbotapi.User) {
-	var chatid = chat.ID
-	var uid = int64(user.ID)
-	if _, ok := h.Groups[chatid]; !ok {
-		h.Groups[chatid] = &Group{Users: make(map[int64]*User)}
+func (h *StatHook) Inc(user string) {
+	if _, ok := h.store.Users[user]; !ok {
+		h.store.Users[user] = &User{}
 	}
-	if _, ok := h.Groups[chatid].Users[uid]; !ok {
-		h.Groups[chatid].Users[uid] = &User{}
-	}
-	h.Groups[chatid].Users[uid].FirstName = user.FirstName
-	h.Groups[chatid].Users[uid].LastName = user.LastName
-	h.Groups[chatid].Users[uid].UserName = user.UserName
-	h.Groups[chatid].Users[uid].Count++
+	h.store.Users[user].UserName = user
+	h.store.Users[user].Count++
 }
 
 func (h *StatHook) Save(force bool) {
 	if !h.Changed && !force {
 		return
 	}
-	store := &Store{}
-	store.Groups = h.Groups
 
-	b, err := proto.Marshal(store)
+	b, err := proto.Marshal(h.store)
 	if err != nil {
 		log.Println(err)
 		return
@@ -145,6 +152,7 @@ func (h *StatHook) Save(force bool) {
 		log.Println(err)
 		return
 	}
+	h.Changed = false
 	log.Println("save stat data")
 }
 

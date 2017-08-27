@@ -7,12 +7,12 @@ import (
 	"net/http"
 
 	avbot "github.com/hyqhyq3/avbot-telegram"
-	"gopkg.in/telegram-bot-api.v4"
 )
 
 type GithubHook struct {
 	server *http.Server
 	bot    *avbot.AVBot
+	sendCh chan<- *avbot.MessageInfo
 }
 
 func New(bot *avbot.AVBot, addr string) (ret *GithubHook) {
@@ -53,6 +53,14 @@ func getCommitDesc(commits []Commit) string {
 	return comments
 }
 
+func (h *GithubHook) GetName() string {
+	return "Github Webhook"
+}
+
+func (h *GithubHook) SetSendMessageChannel(ch chan *avbot.MessageInfo) {
+	h.sendCh = ch
+}
+
 func (h *GithubHook) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/github/avplayer" {
 		name := r.Header.Get("X-GitHub-Event")
@@ -71,13 +79,9 @@ func (h *GithubHook) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				w.Write([]byte("OK"))
 				return
 			}
-			m := tgbotapi.NewMessage(h.bot.GetGroupChatId(), string(evt.Sender.Login+" "+evt.Action+" "+desc))
-			h.bot.Send(m)
+			m := avbot.NewTextMessage(h, string(evt.Sender.Login+" "+evt.Action+" "+desc))
+			h.sendCh <- m
 		}
 	}
 	w.Write([]byte("OK"))
-}
-
-func (h *GithubHook) Process(bot *avbot.AVBot, msg *tgbotapi.Message) (processed bool) {
-	return false
 }

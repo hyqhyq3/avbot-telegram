@@ -1,5 +1,5 @@
 syntax = "proto3";
-package chatlog;
+package data;
 
 enum MessageType
 {
@@ -9,7 +9,8 @@ enum MessageType
     VIDEO       = 3;
 };
 
-message ChatLog
+
+message Message
 {
     uint64          MessageId   = 1;
     MessageType     Type        = 2;
@@ -18,4 +19,5 @@ message ChatLog
     string          FileID      = 5;
     int64           Timestamp   = 6;
     int64           UID         = 7;
+    string          Channel     = 8; // 从哪个渠道过来的消息
 };

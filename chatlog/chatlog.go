@@ -8,9 +8,9 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	avbot "github.com/hyqhyq3/avbot-telegram"
+	"github.com/hyqhyq3/avbot-telegram/data"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
-	"gopkg.in/telegram-bot-api.v4"
 )
 
 //go:generate protoc data.proto --go_out=.
@@ -55,7 +55,11 @@ func (h *ChatLogHook) Init(filepath string) (err error) {
 	return
 }
 
-func (h *ChatLogHook) AddLog(l *ChatLog) {
+func (h *ChatLogHook) GetName() string {
+	return "ChatLog"
+}
+
+func (h *ChatLogHook) AddLog(l *data.Message) {
 	id := atomic.AddUint64(&h.index, 1)
 	l.MessageId = id
 
@@ -84,17 +88,17 @@ func (h *ChatLogHook) Stop() {
 	}
 }
 
-func (h *ChatLogHook) Get(from, to uint64) []*ChatLog {
+func (h *ChatLogHook) Get(from, to uint64) []*data.Message {
 	i := make([]byte, 8)
 	j := make([]byte, 8)
 	binary.LittleEndian.PutUint64(i, from)
 	binary.LittleEndian.PutUint64(j, to)
-	logs := make([]*ChatLog, 0, 100)
+	logs := make([]*data.Message, 0, 100)
 	iter := h.db.NewIterator(&util.Range{Start: i, Limit: j}, nil)
 	for iter.Next() {
-		data := iter.Value()
-		msg := &ChatLog{}
-		proto.Unmarshal(data, msg)
+		p := iter.Value()
+		msg := &data.Message{}
+		proto.Unmarshal(p, msg)
 
 		logs = append(logs, msg)
 		log.Println(msg)
@@ -103,7 +107,7 @@ func (h *ChatLogHook) Get(from, to uint64) []*ChatLog {
 	return logs
 }
 
-func (h *ChatLogHook) Last(num uint64) []*ChatLog {
+func (h *ChatLogHook) Last(num uint64) []*data.Message {
 	var from uint64
 	if h.index > num {
 		from = h.index - num
@@ -113,20 +117,7 @@ func (h *ChatLogHook) Last(num uint64) []*ChatLog {
 	return h.Get(from, h.index)
 }
 
-func (h *ChatLogHook) Process(bot *avbot.AVBot, msg *tgbotapi.Message) (processed bool) {
-
-	switch {
-	case msg.Text != "":
-		log := &ChatLog{
-			Content:   msg.Text,
-			From:      msg.From.FirstName,
-			Type:      MessageType_TEXT,
-			Timestamp: msg.Time().Unix(),
-			UID:       int64(msg.From.ID),
-		}
-
-		h.AddLog(log)
-	case msg.Photo != nil:
-	}
+func (h *ChatLogHook) Process(bot *avbot.AVBot, msg *avbot.MessageInfo) (processed bool) {
+	h.AddLog(msg.Message)
 	return false
 }

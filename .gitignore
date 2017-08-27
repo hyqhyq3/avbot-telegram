@@ -1,0 +1,6 @@
+cmd/avbot/avbot
+cmd/avbot/stat.dat
+cmd/avbot/*.dat
+cmd/avbot/*.yaml
+cmd/avbot/*.log
+.vscode

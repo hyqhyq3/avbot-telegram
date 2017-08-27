@@ -5,33 +5,34 @@ import (
 
 	avbot "github.com/hyqhyq3/avbot-telegram"
 	"gopkg.in/sorcix/irc.v1"
-	"gopkg.in/telegram-bot-api.v4"
 )
 
 type JokeHook struct {
 	Irc    *irc.Conn
 	bot    *avbot.AVBot
-	chatId int64
 	ch     string
 	nick   string
+	sendCh chan<- *avbot.MessageInfo
 }
 
-func New(bot *avbot.AVBot, ch, nick string) *JokeHook {
+func New(bot *avbot.AVBot, ch, nick string) avbot.Component {
 	return &JokeHook{
-		bot:    bot,
-		ch:     ch,
-		nick:   nick,
-		chatId: 0,
+		bot:  bot,
+		ch:   ch,
+		nick: nick,
 	}
 }
 
-func (h *JokeHook) Process(bot *avbot.AVBot, msg *tgbotapi.Message) (processed bool) {
-	if msg.From != nil {
-		h.SendToIrc(msg.From.FirstName + ":" + msg.Text)
-		if msg.Chat.Type == "group" || msg.Chat.Type == "supergroup" {
-			h.chatId = msg.Chat.ID
-		}
-	}
+func (h *JokeHook) GetName() string {
+	return "IRC"
+}
+
+func (h *JokeHook) SetSendMessageChannel(ch chan<- *avbot.MessageInfo) {
+	h.sendCh = ch
+}
+
+func (h *JokeHook) Process(bot *avbot.AVBot, msg *avbot.MessageInfo) (processed bool) {
+	h.SendToIrc(msg.From + ":" + msg.Content)
 	return false
 }
 
@@ -46,10 +47,7 @@ func (h *JokeHook) SendToIrc(text string) {
 }
 
 func (h *JokeHook) SendToTg(text string) {
-	if h.chatId != 0 {
-		msg := tgbotapi.NewMessage(h.chatId, text)
-		h.bot.Send(msg)
-	}
+	h.sendCh <- avbot.NewTextMessage(h, text)
 }
 
 func (h *JokeHook) ConnectToIrc() {

@@ -1,84 +1,67 @@
 package avbot
 
 import (
+	"errors"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
-
-	"golang.org/x/net/proxy"
-	tgbotapi "gopkg.in/telegram-bot-api.v4"
 )
 
 type AVBot struct {
-	*tgbotapi.BotAPI
-	hooks       []MessageHook
-	client      *http.Client
-	groupChatId int64
-	closeCh     chan int
+	components map[string]Component
+	processors []HasProcess
+	client     *http.Client
+	closeCh    chan int
+
+	sendMessageChan chan *MessageInfo
 }
 
-func (b *AVBot) AddMessageHook(hook MessageHook) {
-	b.hooks = append(b.hooks, hook)
+func (b *AVBot) AddComponent(hook Component) {
+	if b.components == nil {
+		b.components = make(map[string]Component)
+	}
+
+	if _, found := b.components[hook.GetName()]; found {
+		log.Fatal(errors.New("Component " + hook.GetName() + " exists"))
+	}
+
+	if p, ok := hook.(HasSetSendMessageChannel); ok {
+		p.SetSendMessageChannel(b.sendMessageChan)
+	}
+	if p, ok := hook.(HasInit); ok {
+		p.Init()
+	}
+	if p, ok := hook.(HasProcess); ok {
+		log.Println("register processor", hook.GetName())
+		b.processors = append(b.processors, p)
+	}
+	b.components[hook.GetName()] = hook
 }
 
-func NewBot(token string, chatId int64, socks5Addr string) *AVBot {
-	dial := net.Dial
-	if socks5Addr != "" {
-		dialer, err := proxy.SOCKS5("tcp", socks5Addr, nil, proxy.Direct)
-		if err != nil {
-			panic(err)
-		}
-		dial = dialer.Dial
-	}
-	client := &http.Client{
-		Transport: &http.Transport{
-			Dial: dial,
-		},
-	}
-
-	bot, err := tgbotapi.NewBotAPIWithClient(token, client)
-	if err != nil {
-		panic(err)
-	}
-
+func NewBot() *AVBot {
 	return &AVBot{
-		BotAPI:      bot,
-		hooks:       make([]MessageHook, 0, 0),
-		client:      client,
-		groupChatId: chatId,
-		closeCh:     make(chan int),
+		closeCh:         make(chan int),
+		sendMessageChan: make(chan *MessageInfo),
 	}
 }
 
 func (b *AVBot) Run() {
-
+	log.Println("bot running")
 	go b.HandleSignal()
 
-	b.Debug = true
-
-	log.Printf("Authorized on account %s", b.Self.UserName)
-
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
-
-	updates, err := b.GetUpdatesChan(u)
-	if err != nil {
-		panic(err)
-	}
 mainLoop:
 	for {
 		select {
-		case update := <-updates:
-			if update.Message != nil {
-				b.onMessage(update.Message)
-			}
+		case msg := <-b.sendMessageChan:
+			log.Println("receved message ", msg)
+			b.SendMessage(msg)
 		case <-b.closeCh:
-			b.Stop()
 			break mainLoop
 		}
 	}
+
+	b.Stop()
 }
 
 func (b *AVBot) HandleSignal() {
@@ -89,25 +72,17 @@ func (b *AVBot) HandleSignal() {
 	log.Println("received interrupt signal")
 }
 
-func (b *AVBot) onMessage(msg *tgbotapi.Message) {
-
-	for _, h := range b.hooks {
-		if h.Process(b, msg) {
-			break
+func (b *AVBot) SendMessage(msg *MessageInfo) {
+	for _, h := range b.processors {
+		if h.(Component) != msg.Channel {
+			h.Process(b, msg)
 		}
 	}
 }
 
-func (b *AVBot) GetBotApi() *tgbotapi.BotAPI {
-	return b.BotAPI
-}
-
-func (b *AVBot) GetGroupChatId() int64 {
-	return b.groupChatId
-}
-
 func (b *AVBot) Stop() {
-	for _, v := range b.hooks {
+	log.Println("stop all components")
+	for _, v := range b.components {
 		if o, ok := v.(Stoppable); ok {
 			o.Stop()
 		}

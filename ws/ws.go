@@ -1,37 +1,23 @@
 package ws
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"image"
-	"image/png"
-	"io/ioutil"
 	"log"
-	"mime"
 	"net"
 	"net/http"
-	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/hyqhyq3/avbot-telegram/chatlog"
+	"github.com/hyqhyq3/avbot-telegram/data"
 
 	_ "golang.org/x/image/webp"
 
 	"github.com/gorilla/mux"
 	"github.com/hyqhyq3/avbot-telegram"
 	"golang.org/x/net/websocket"
-	"gopkg.in/telegram-bot-api.v4"
-)
-
-type MessageType int
-
-const (
-	MessageType_Text MessageType = iota + 1
-	MessageType_Image
-	MessageType_Video
 )
 
 type MessageUser struct {
@@ -49,11 +35,12 @@ type MessageData struct {
 	VideoData string       `json:"video_data"`
 	Caption   string       `json:"caption"`
 	User      *MessageUser `json:"user"`
+	FilePath  string       `json:"file_path"`
 }
 
 type Message struct {
-	Cmd  MessageType `json:"cmd"`
-	Data MessageData `json:"data"`
+	Cmd  data.MessageType `json:"cmd"`
+	Data MessageData      `json:"data"`
 }
 
 type WSChatServer struct {
@@ -63,15 +50,17 @@ type WSChatServer struct {
 	bot         *avbot.AVBot
 	index       int
 	Token       string
+	sendCh      chan<- *avbot.MessageInfo
 }
 
-func New(bot *avbot.AVBot, token string, port int) avbot.MessageHook {
+func New(bot *avbot.AVBot, token string, port int) avbot.Component {
 	wsServer := &websocket.Server{}
 	handler := &WSChatServer{bot: bot}
 
 	r := mux.NewRouter()
 	r.Handle("/", wsServer)
 	r.HandleFunc("/avbot/face/{uid}", handler.GetFace)
+	r.HandleFunc("/avbot/file/{provider}/{fileid}", handler.GetFile)
 	r.HandleFunc("/avbot/history/{from}-{to}", handler.GetHistory)
 	handler.Handle("/", r)
 
@@ -86,6 +75,15 @@ func New(bot *avbot.AVBot, token string, port int) avbot.MessageHook {
 	return handler
 }
 
+func (ws *WSChatServer) GetName() string {
+	return "WebSocketClient"
+}
+
+func (ws *WSChatServer) SetSendMessageChannel(sendCh chan<- *avbot.MessageInfo) {
+	ws.sendCh = sendCh
+}
+
+/*
 func (ws *WSChatServer) GetFace(w http.ResponseWriter, r *http.Request) {
 	c, rw, _ := w.(http.Hijacker).Hijack()
 
@@ -147,10 +145,11 @@ func (ws *WSChatServer) GetFace(w http.ResponseWriter, r *http.Request) {
 		rw.Flush()
 	}()
 }
+*/
 
-func chatLogToWsMsg(msg *chatlog.ChatLog) *Message {
+func chatLogToWsMsg(msg *data.Message) *Message {
 	wsMsg := &Message{}
-	wsMsg.Cmd = MessageType(msg.Type)
+	wsMsg.Cmd = msg.Type
 	wsMsg.Data.Msg = msg.Content
 	wsMsg.Data.From = msg.From
 	wsMsg.Data.Timestamp = strconv.FormatInt(msg.Timestamp, 10)
@@ -160,7 +159,7 @@ func chatLogToWsMsg(msg *chatlog.ChatLog) *Message {
 	return wsMsg
 }
 
-func chatLogToWsMsgArr(msgs []*chatlog.ChatLog) []*Message {
+func chatLogToWsMsgArr(msgs []*data.Message) []*Message {
 	arr := make([]*Message, len(msgs))
 
 	for k, v := range msgs {
@@ -173,21 +172,38 @@ func (ws *WSChatServer) GetHistory(w http.ResponseWriter, r *http.Request) {
 	from, _ := strconv.ParseUint(mux.Vars(r)["from"], 10, 64)
 	to, _ := strconv.ParseUint(mux.Vars(r)["to"], 10, 64)
 
-	msgs := make([]*Message, 0, 100)
-	for _, msg := range chatlog.GetInstance().Get(from, to) {
-		wsMsg := &Message{}
-		wsMsg.Cmd = MessageType(msg.Type)
-		wsMsg.Data.Msg = msg.Content
-		wsMsg.Data.From = msg.From
-		wsMsg.Data.Timestamp = strconv.FormatInt(msg.Timestamp, 10)
-		msgs = append(msgs, wsMsg)
-	}
+	msgs := chatLogToWsMsgArr(chatlog.GetInstance().Get(from, to))
 
 	data, _ := json.Marshal(msgs)
 	w.Write(data)
 }
 
-func (ws *WSChatServer) Process(bot *avbot.AVBot, msg *tgbotapi.Message) bool {
+func (ws *WSChatServer) GetFile(w http.ResponseWriter, r *http.Request) {
+	fileid := mux.Vars(r)["fileid"]
+	provider := mux.Vars(r)["provider"]
+	b, t, err := avbot.GetFile(provider, fileid)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+	} else {
+		w.Header().Set("Content-Type", t)
+		w.Write(b)
+	}
+}
+
+func (ws *WSChatServer) GetFace(w http.ResponseWriter, r *http.Request) {
+	uid := mux.Vars(r)["uid"]
+	b, t, err := avbot.GetFace("tg", uid)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(err.Error()))
+		log.Println("no face " + uid)
+	} else {
+		w.Header().Set("Content-Type", t)
+		w.Write(b)
+	}
+}
+
+func (ws *WSChatServer) Process(bot *avbot.AVBot, msg *avbot.MessageInfo) bool {
 
 	go ws.AsyncGetWsMsg(msg, func(wsMsg *Message) {
 		if wsMsg != nil {
@@ -197,92 +213,35 @@ func (ws *WSChatServer) Process(bot *avbot.AVBot, msg *tgbotapi.Message) bool {
 	return false
 }
 
-func (ws *WSChatServer) Download(fileID string) (data []byte, typ string, err error) {
-	file, err := ws.bot.GetFile(tgbotapi.FileConfig{FileID: fileID})
-	if err != nil {
-		return
-	}
-	link := file.Link(ws.Token)
-
-	resp, err := ws.bot.Client.Get(link)
-	if err != nil {
-		return
-	}
-	data, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return
-	}
-
-	typ = mime.TypeByExtension(filepath.Ext(file.FilePath))
-	return
-}
-
-func (ws *WSChatServer) AsyncGetWsMsg(msg *tgbotapi.Message, cb func(wsMsg *Message)) {
+func (ws *WSChatServer) AsyncGetWsMsg(msg *avbot.MessageInfo, cb func(wsMsg *Message)) {
 	var wsMsg *Message
 	var usr *MessageUser
 
-	if msg.From != nil {
-		usr = &MessageUser{ID: msg.From.ID, Name: msg.From.FirstName}
-	}
+	usr = &MessageUser{ID: int(msg.UID), Name: msg.From}
 
-	ts := strconv.Itoa(getNow())
-	switch {
-	case msg.Text != "":
+	ts := strconv.Itoa(avbot.GetNow())
+	switch msg.Type {
+	case data.MessageType_TEXT:
 		wsMsg = &Message{
-			Cmd: MessageType_Text,
+			Cmd: msg.Type,
 			Data: MessageData{
 				Timestamp: ts,
-				Msg:       msg.Text,
-				From:      msg.From.FirstName,
+				Msg:       msg.Content,
+				From:      msg.From,
 				User:      usr,
 			},
 		}
-	case (msg.Photo != nil && len(*msg.Photo) > 0) || msg.Sticker != nil || msg.Document != nil:
-		cmdType := MessageType_Image
-		var fileID string
-		if msg.Photo != nil && len(*msg.Photo) > 0 {
-			fileID = (*msg.Photo)[0].FileID
-		} else if msg.Sticker != nil {
-			if msg.Sticker.Thumbnail != nil {
-				fileID = msg.Sticker.Thumbnail.FileID
-			} else {
-				fileID = msg.Sticker.FileID
-			}
-		} else if msg.Document != nil {
-			fileID = msg.Document.FileID
-			cmdType = MessageType_Video
-		}
-		data, fileType, err := ws.Download(fileID)
-		if err != nil {
-			log.Println(err)
-			return
-		}
+	case data.MessageType_IMAGE, data.MessageType_VIDEO:
 
-		img, fileType, err := image.Decode(bytes.NewReader(data))
-
-		if err == nil && fileType == "webp" {
-			buf := &bytes.Buffer{}
-			png.Encode(buf, img)
-			data = buf.Bytes()
-			fileType = "image/png"
-		}
-
-		fileData := base64.StdEncoding.EncodeToString(data)
 		wsMsg = &Message{
-			Cmd: cmdType,
+			Cmd: msg.Type,
 			Data: MessageData{
 				Timestamp: ts,
-				From:      msg.From.FirstName,
-				Caption:   msg.Caption,
+				Msg:       msg.Content,
+				From:      msg.From,
 				User:      usr,
+				FilePath:  "avbot/file/" + msg.Message.Channel + "/" + msg.FileID,
 			},
-		}
-		if cmdType == MessageType_Image {
-			wsMsg.Data.ImgData = fileData
-			wsMsg.Data.ImgType = fileType
-		} else if cmdType == MessageType_Video {
-			wsMsg.Data.VideoData = fileData
-			wsMsg.Data.VideoType = fileType
 		}
 	}
 
@@ -321,18 +280,9 @@ func (ws *WSChatServer) OnNewClient(c *websocket.Conn) {
 		err := websocket.JSON.Receive(c, msg)
 		if err == nil {
 			log.Printf("received message type: %d from: %s text: %s", msg.Cmd, msg.Data.From, msg.Data.Msg)
-			go ws.AsyncGetTgMsg(msg, func(tgmsg tgbotapi.Chattable) {
-				ws.bot.Send(tgmsg)
+			go ws.AsyncGetAvbotMsg(msg, func(botMsg *avbot.MessageInfo) {
+				ws.sendCh <- botMsg
 				ws.Broadcast(msg)
-
-				chatLog := &chatlog.ChatLog{}
-				chatLog.Content = msg.Data.Msg
-				chatLog.Type = chatlog.MessageType(msg.Cmd)
-				chatLog.From = msg.Data.From
-				if msg.Data.User != nil {
-					chatLog.UID = int64(msg.Data.User.ID)
-				}
-				chatlog.GetInstance().AddLog(chatLog)
 			})
 
 		} else {
@@ -352,39 +302,53 @@ func (ws *WSChatServer) OnNewClient(c *websocket.Conn) {
 	ws.clientMutex.Unlock()
 }
 
-func (ws *WSChatServer) AsyncGetTgMsg(msg *Message, cb func(tgbotapi.Chattable)) {
-	var tgmsg tgbotapi.Chattable
-	chatId := ws.bot.GetGroupChatId()
+type WSImageData struct {
+	Data []byte
+	Type string
+}
+
+func (ws *WSChatServer) AsyncGetAvbotMsg(msg *Message, cb func(*avbot.MessageInfo)) {
+	botMsg := &avbot.MessageInfo{}
+
+	ts, err := strconv.ParseInt(msg.Data.Timestamp, 10, 64)
+	if err != nil {
+		ts = time.Now().Unix()
+	}
+	var dataMsg *data.Message
 
 	switch msg.Cmd {
-	case MessageType_Text:
-		tgmsg = tgbotapi.NewMessage(chatId, msg.Data.From+": "+msg.Data.Msg)
-	case MessageType_Image:
-		data, err := base64.StdEncoding.DecodeString(msg.Data.ImgData)
-		if err != nil {
-			log.Println("image data error")
+	case data.MessageType_TEXT:
+		dataMsg = &data.Message{
+			Type:      msg.Cmd,
+			Timestamp: ts,
+			Content:   msg.Data.Msg,
+			From:      msg.Data.From,
 		}
-		photo := tgbotapi.NewPhotoUpload(chatId, tgbotapi.FileBytes{
-			Name:  getRandomImageName(msg.Data.ImgType),
-			Bytes: data,
-		})
-		photo.Caption = msg.Data.From + ":" + msg.Data.Caption
-		tgmsg = photo
-	}
-	if tgmsg != nil {
-		cb(tgmsg)
-	}
-}
+	case data.MessageType_IMAGE:
 
-func getNow() int {
-	return int(time.Now().Unix())
-}
+		dataMsg = &data.Message{
+			Type:      msg.Cmd,
+			Timestamp: ts,
+			Content:   msg.Data.Msg,
+			From:      msg.Data.From,
+		}
 
-func getRandomImageName(typ string) string {
-	name := strconv.Itoa(getNow())
-	ext, _ := mime.ExtensionsByType(typ)
-	if ext != nil || len(ext) > 0 {
-		return name + ext[0]
 	}
-	return name + ".png"
+
+	if botMsg != nil {
+		botMsg.Message = dataMsg
+		botMsg.Channel = ws
+
+		if msg.Cmd == data.MessageType_IMAGE {
+			data, err := base64.StdEncoding.DecodeString(msg.Data.ImgData)
+			if err == nil {
+				botMsg.ExtraData = &WSImageData{
+					Type: msg.Data.ImgType,
+					Data: data,
+				}
+			}
+		}
+
+		cb(botMsg)
+	}
 }
