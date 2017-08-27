@@ -74,6 +74,7 @@ func (h *StatHook) Process(bot *avbot.AVBot, msg *avbot.MessageInfo) (processed 
 		h.Changed = true
 	}
 	cmd := strings.Split(msg.Content, " ")
+	cmd = strings.Split(cmd[0], "@")
 	if cmd[0] == "/stat" {
 		mymsg := avbot.NewTextMessage(h, h.GetStat())
 
