@@ -20,6 +20,7 @@ type StatHook struct {
 	closeCh  chan int
 	store    *Store
 	sendCh   chan<- *avbot.MessageInfo
+	lastUser string
 }
 
 func New(filename string) (h *StatHook) {
@@ -69,16 +70,19 @@ mainLoop:
 }
 
 func (h *StatHook) Process(bot *avbot.AVBot, msg *avbot.MessageInfo) (processed bool) {
-	if msg != nil {
-		h.Inc(msg.From)
-		h.Changed = true
-	}
-	cmd := strings.Split(msg.Content, " ")
-	cmd = strings.Split(cmd[0], "@")
-	if cmd[0] == "/stat" {
-		mymsg := avbot.NewTextMessage(h, h.GetStat())
+	if h.lastUser != msg.From {
+		h.lastUser = msg.From
+		if msg != nil {
+			h.Inc(msg.From)
+			h.Changed = true
+		}
+		cmd := strings.Split(msg.Content, " ")
+		cmd = strings.Split(cmd[0], "@")
+		if cmd[0] == "/stat" {
+			mymsg := avbot.NewTextMessage(h, h.GetStat())
 
-		bot.SendMessage(mymsg)
+			bot.SendMessage(mymsg)
+		}
 	}
 	return false
 }
