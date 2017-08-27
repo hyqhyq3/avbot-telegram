@@ -75,6 +75,7 @@ func (b *AVBot) HandleSignal() {
 func (b *AVBot) SendMessage(msg *MessageInfo) {
 	for _, h := range b.processors {
 		if h.(Component) != msg.Channel {
+			log.Println("handle message by " + h.(Component).GetName())
 			h.Process(b, msg)
 		}
 	}

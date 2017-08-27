@@ -68,10 +68,6 @@ mainLoop:
 	}
 }
 
-func (h *StatHook) SetSendMessageChannel(ch chan<- *avbot.MessageInfo) {
-	h.sendCh = ch
-}
-
 func (h *StatHook) Process(bot *avbot.AVBot, msg *avbot.MessageInfo) (processed bool) {
 	if msg != nil {
 		h.Inc(msg.From)
@@ -81,7 +77,7 @@ func (h *StatHook) Process(bot *avbot.AVBot, msg *avbot.MessageInfo) (processed 
 	if cmd[0] == "/stat" {
 		mymsg := avbot.NewTextMessage(h, h.GetStat())
 
-		h.sendCh <- mymsg
+		bot.SendMessage(mymsg)
 	}
 	return false
 }
@@ -118,7 +114,7 @@ func (h *StatHook) GetStat() string {
 
 	var str = ""
 	for i := 0; i < min(10, len(data)); i++ {
-		str = str + fmt.Sprintf("%s %s: %d\n", data[i].UserName, data[i].Count)
+		str = str + fmt.Sprintf("%s: %d\n", data[i].UserName, data[i].Count)
 	}
 	return str
 }
