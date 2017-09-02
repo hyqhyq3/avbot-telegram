@@ -86,87 +86,28 @@ func (ws *WSChatServer) SetSendMessageChannel(sendCh chan<- *avbot.MessageInfo) 
 	ws.sendCh = sendCh
 }
 
-/*
-func (ws *WSChatServer) GetFace(w http.ResponseWriter, r *http.Request) {
-	c, rw, _ := w.(http.Hijacker).Hijack()
-
-	go func() {
-		defer c.Close()
-
-		uid, err := strconv.Atoi(mux.Vars(r)["uid"])
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		photos, err := ws.bot.GetUserProfilePhotos(tgbotapi.UserProfilePhotosConfig{UserID: uid, Offset: 0, Limit: 1})
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		if photos.TotalCount == 0 {
-			log.Println("no photo")
-			return
-		}
-
-		photoSize := photos.Photos[0][0]
-		file, err := ws.bot.GetFile(tgbotapi.FileConfig{FileID: photoSize.FileID})
-		if err != nil {
-			log.Println("unable to get file")
-			return
-		}
-
-		if r.Header.Get("If-None-Match") == file.FileID {
-			rw.WriteString("HTTP/1.1 304 Not Modified\r\n")
-			rw.WriteString("\r\n")
-			rw.Flush()
-			return
-		}
-
-		url, err := ws.bot.GetFileDirectURL(photoSize.FileID)
-		if err != nil {
-			log.Println("cannot get download link")
-			return
-		}
-		resp, err := ws.bot.Client.Get(url)
-		if err != nil {
-			log.Println("cannot download photo")
-			return
-		}
-		data, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			log.Println("failed to download photo")
-			return
-		}
-
-		rw.WriteString("HTTP/1.1 200 OK\r\n")
-		rw.WriteString("Cache-Control: max-age=2592000\r\n")
-		rw.WriteString("ETag: " + file.FileID + "\r\n")
-		rw.WriteString("Content-Type: " + mime.TypeByExtension(filepath.Ext(file.FilePath)) + "\r\n")
-		rw.WriteString("Content-Length: " + strconv.Itoa(len(data)) + "\r\n")
-		rw.WriteString("\r\n")
-		rw.Write(data)
-		rw.Flush()
-	}()
+func (ws *WSChatServer) GetFilePath(msg *data.Message) string {
+	return "/avbot/file/" + msg.Channel + "/" + msg.FileID
 }
-*/
 
-func chatLogToWsMsg(msg *data.Message) *Message {
+func (ws *WSChatServer) chatLogToWsMsg(msg *data.Message) *Message {
 	wsMsg := &Message{}
 	wsMsg.Cmd = msg.Type
 	wsMsg.Data.Msg = msg.Content
 	wsMsg.Data.From = msg.From
 	wsMsg.Data.Timestamp = strconv.FormatInt(msg.Timestamp, 10)
+	wsMsg.Data.FilePath = ws.GetFilePath(msg)
 	if msg.UID != 0 {
 		wsMsg.Data.User = &MessageUser{Name: msg.From, ID: int(msg.UID)}
 	}
 	return wsMsg
 }
 
-func chatLogToWsMsgArr(msgs []*data.Message) []*Message {
+func (ws *WSChatServer) chatLogToWsMsgArr(msgs []*data.Message) []*Message {
 	arr := make([]*Message, len(msgs))
 
 	for k, v := range msgs {
-		arr[k] = chatLogToWsMsg(v)
+		arr[k] = ws.chatLogToWsMsg(v)
 	}
 	return arr
 }
@@ -175,7 +116,7 @@ func (ws *WSChatServer) GetHistory(w http.ResponseWriter, r *http.Request) {
 	from, _ := strconv.ParseUint(mux.Vars(r)["from"], 10, 64)
 	to, _ := strconv.ParseUint(mux.Vars(r)["to"], 10, 64)
 
-	msgs := chatLogToWsMsgArr(chatlog.GetInstance().Get(from, to))
+	msgs := ws.chatLogToWsMsgArr(chatlog.GetInstance().Get(from, to))
 
 	data, _ := json.Marshal(msgs)
 	w.Write(data)
@@ -220,7 +161,9 @@ func (ws *WSChatServer) GetFace(w http.ResponseWriter, r *http.Request) {
 
 func (ws *WSChatServer) Process(bot *avbot.AVBot, msg *avbot.MessageInfo) bool {
 
+	log.Println("msg", msg)
 	go ws.AsyncGetWsMsg(msg, func(wsMsg *Message) {
+		log.Println("wsmsg", wsMsg)
 		if wsMsg != nil {
 			ws.Broadcast(wsMsg)
 		}
@@ -285,7 +228,7 @@ func (ws *WSChatServer) OnNewClient(c *websocket.Conn) {
 
 	chatLog := chatlog.GetInstance().Last(10)
 
-	for _, v := range chatLogToWsMsgArr(chatLog) {
+	for _, v := range ws.chatLogToWsMsgArr(chatLog) {
 		websocket.JSON.Send(c, v)
 	}
 
