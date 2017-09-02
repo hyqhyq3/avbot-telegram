@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/hyqhyq3/avbot-telegram/ws"
 
@@ -19,6 +20,10 @@ import (
 	"golang.org/x/net/proxy"
 	"gopkg.in/telegram-bot-api.v4"
 )
+
+func init() {
+	mime.AddExtensionType(".webp", "image/webp")
+}
 
 type Telegram struct {
 	*tgbotapi.BotAPI
@@ -61,7 +66,13 @@ func (h *Telegram) GetFile(fileid string) (p []byte, filetype string, err error)
 		return
 	}
 
-	filetype = mime.TypeByExtension(filepath.Ext(file.FilePath))
+	log.Println("file path: ", file.FilePath)
+	ext := filepath.Ext(file.FilePath)
+	if ext == "" && strings.HasPrefix(file.FilePath, "stickers") {
+		filetype = "image/webp"
+	} else {
+		filetype = mime.TypeByExtension(ext)
+	}
 
 	rsp, err := h.Client.Get(file.Link(h.Token))
 	if err != nil {

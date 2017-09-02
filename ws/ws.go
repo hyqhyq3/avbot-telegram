@@ -1,8 +1,11 @@
 package ws
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"image"
+	"image/png"
 	"log"
 	"net"
 	"net/http"
@@ -182,6 +185,18 @@ func (ws *WSChatServer) GetFile(w http.ResponseWriter, r *http.Request) {
 	fileid := mux.Vars(r)["fileid"]
 	provider := mux.Vars(r)["provider"]
 	b, t, err := avbot.GetFile(provider, fileid)
+
+	if t == "image/webp" {
+		t = "image/png"
+		img, _, err := image.Decode(bytes.NewBuffer(b))
+		if err != nil {
+			log.Println("decode webp failed ", err)
+		}
+		buf := &bytes.Buffer{}
+		png.Encode(buf, img)
+		b = buf.Bytes()
+	}
+
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 	} else {
