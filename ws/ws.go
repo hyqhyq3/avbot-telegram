@@ -39,6 +39,7 @@ type MessageData struct {
 	Caption   string       `json:"caption"`
 	User      *MessageUser `json:"user"`
 	FilePath  string       `json:"file_path"`
+	ID        int          `json:"id"`
 }
 
 type Message struct {
@@ -92,6 +93,7 @@ func (ws *WSChatServer) GetFilePath(msg *data.Message) string {
 
 func (ws *WSChatServer) chatLogToWsMsg(msg *data.Message) *Message {
 	wsMsg := &Message{}
+	wsMsg.Data.ID = int(msg.MessageId)
 	wsMsg.Cmd = msg.Type
 	wsMsg.Data.Msg = msg.Content
 	wsMsg.Data.From = msg.From
@@ -183,6 +185,7 @@ func (ws *WSChatServer) AsyncGetWsMsg(msg *avbot.MessageInfo, cb func(wsMsg *Mes
 		wsMsg = &Message{
 			Cmd: msg.Type,
 			Data: MessageData{
+				ID:        int(msg.MessageId),
 				Timestamp: ts,
 				Msg:       msg.Content,
 				From:      msg.From,
@@ -194,6 +197,7 @@ func (ws *WSChatServer) AsyncGetWsMsg(msg *avbot.MessageInfo, cb func(wsMsg *Mes
 		wsMsg = &Message{
 			Cmd: msg.Type,
 			Data: MessageData{
+				ID:        int(msg.MessageId),
 				Timestamp: ts,
 				Msg:       msg.Content,
 				From:      msg.From,
