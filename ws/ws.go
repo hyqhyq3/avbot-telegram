@@ -297,7 +297,9 @@ func (ws *WSChatServer) OnNewClient(c *websocket.Conn) {
 			log.Printf("received message type: %d from: %s text: %s", msg.Cmd, msg.Data.From, msg.Data.Msg)
 			go ws.AsyncGetAvbotMsg(msg, func(botMsg *avbot.MessageInfo) {
 				ws.sendCh <- botMsg
-				ws.Broadcast(msg)
+				ws.AsyncGetWsMsg(botMsg, func(msg *Message) {
+					ws.Broadcast(msg)
+				})
 			})
 
 		} else {
