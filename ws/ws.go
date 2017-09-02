@@ -177,7 +177,9 @@ func (ws *WSChatServer) AsyncGetWsMsg(msg *avbot.MessageInfo, cb func(wsMsg *Mes
 	var wsMsg *Message
 	var usr *MessageUser
 
-	usr = &MessageUser{ID: int(msg.UID), Name: msg.From}
+	if msg.UID != 0 {
+		usr = &MessageUser{ID: int(msg.UID), Name: msg.From}
+	}
 
 	ts := strconv.Itoa(avbot.GetNow())
 	switch msg.Type {
