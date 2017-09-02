@@ -3,12 +3,12 @@ package chatlog
 import (
 	"encoding/binary"
 	"log"
-	"sync/atomic"
 
 	"github.com/golang/protobuf/proto"
 
 	avbot "github.com/hyqhyq3/avbot-telegram"
 	"github.com/hyqhyq3/avbot-telegram/data"
+	"github.com/hyqhyq3/avbot-telegram/store"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
@@ -16,8 +16,7 @@ import (
 //go:generate protoc data.proto --go_out=.
 
 type ChatLogHook struct {
-	db    *leveldb.DB
-	index uint64
+	db *leveldb.DB
 }
 
 var instance *ChatLogHook
@@ -39,19 +38,6 @@ func (h *ChatLogHook) Init(filepath string) (err error) {
 	if err != nil {
 		return
 	}
-	b, err := h.db.Get([]byte("_index"), nil)
-	if err != nil && err != leveldb.ErrNotFound {
-		return
-	}
-	if err != nil {
-		h.index = 0
-	} else {
-		if len(b) == 8 {
-			h.index = binary.LittleEndian.Uint64(b)
-		} else {
-			h.index = 0
-		}
-	}
 	return
 }
 
@@ -60,8 +46,6 @@ func (h *ChatLogHook) GetName() string {
 }
 
 func (h *ChatLogHook) AddLog(l *data.Message) {
-	id := atomic.AddUint64(&h.index, 1)
-	l.MessageId = id
 
 	b, err := proto.Marshal(l)
 	if err != nil {
@@ -76,10 +60,6 @@ func (h *ChatLogHook) AddLog(l *data.Message) {
 		log.Println(err)
 		return
 	}
-
-	binary.LittleEndian.PutUint64(i, h.index)
-
-	h.db.Put([]byte("_index"), i, nil)
 }
 
 func (h *ChatLogHook) Stop() {
@@ -109,12 +89,13 @@ func (h *ChatLogHook) Get(from, to uint64) []*data.Message {
 
 func (h *ChatLogHook) Last(num uint64) []*data.Message {
 	var from uint64
-	if h.index > num {
-		from = h.index - num
+	var index = store.GetStore().MessageIDIndex
+	if index > num {
+		from = store.GetStore().MessageIDIndex - num
 	} else {
 		from = 0
 	}
-	return h.Get(from, h.index)
+	return h.Get(from, index)
 }
 
 func (h *ChatLogHook) Process(bot *avbot.AVBot, msg *avbot.MessageInfo) (processed bool) {

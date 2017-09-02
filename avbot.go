@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+
+	"github.com/hyqhyq3/avbot-telegram/store"
 )
 
 type AVBot struct {
@@ -55,6 +57,10 @@ mainLoop:
 		select {
 		case msg := <-b.sendMessageChan:
 			log.Println("receved message ", msg)
+			s := store.GetStore()
+			s.MessageIDIndex++
+			s.Save()
+			msg.MessageId = s.MessageIDIndex
 			b.SendMessage(msg)
 		case <-b.closeCh:
 			break mainLoop
