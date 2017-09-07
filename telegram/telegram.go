@@ -182,8 +182,13 @@ func (h *Telegram) Forward(msg *tgbotapi.Message) {
 		botMsg = avbot.NewChatMemberMessage(h)
 	}
 	if botMsg != nil {
-		botMsg.From = msg.From.UserName
-		botMsg.UID = int64(msg.From.ID)
+		if msg.NewChatMember != nil {
+			botMsg.From = msg.NewChatMember.UserName
+			botMsg.UID = msg.NewChatMember.ID
+		} else {
+			botMsg.From = msg.From.UserName
+			botMsg.UID = int64(msg.From.ID)
+		}
 		botMsg.Message.Channel = "tg"
 		h.sendCh <- botMsg
 	}
