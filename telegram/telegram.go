@@ -213,9 +213,16 @@ func (h *Telegram) GetPhotoFileID(photo *[]tgbotapi.PhotoSize) string {
 		minSize := math.MaxInt32
 		fileID := ""
 		for _, p := range *photo {
-			if p.FileSize < minSize {
-				minSize = p.FileSize
-				fileID = p.FileID
+			if p.Width <= 320 && p.Height <= 320 {
+				if p.FileSize > minSize {
+					minSize = p.FileSize
+					fileID = p.FileID
+				}
+			} else {
+				if p.FileSize < minSize {
+					minSize = p.FileSize
+					fileID = p.FileID
+				}
 			}
 		}
 		return fileID
