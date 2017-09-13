@@ -1,6 +1,7 @@
 package avbot
 
 import (
+	"sync"
 	"errors"
 	"log"
 	"net/http"
@@ -48,6 +49,17 @@ func NewBot() *AVBot {
 	}
 }
 
+var mutex = sync.Mutex
+func (b *AVBot) GetIDAndInc() {
+	mutex.Lock()
+	defer mutex.Unlock()
+	
+	s := store.GetStore()
+	s.MessageIDIndex++
+	s.Save()
+	return s.MessageIDIndex
+}
+
 func (b *AVBot) Run() {
 	log.Println("bot running")
 	go b.HandleSignal()
@@ -57,10 +69,9 @@ mainLoop:
 		select {
 		case msg := <-b.sendMessageChan:
 			log.Println("receved message ", msg)
-			s := store.GetStore()
-			s.MessageIDIndex++
-			s.Save()
-			msg.MessageId = s.MessageIDIndex
+			if msg.MessageId == 0 {
+				msg.MessageId = b.GetIDAndInc()
+			}
 			b.SendMessage(msg)
 		case <-b.closeCh:
 			break mainLoop
