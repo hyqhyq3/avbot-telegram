@@ -49,8 +49,8 @@ func NewBot() *AVBot {
 	}
 }
 
-var mutex = sync.Mutex
-func (b *AVBot) GetIDAndInc() {
+var mutex = &sync.Mutex{}
+func (b *AVBot) GetIDAndInc() uint64 {
 	mutex.Lock()
 	defer mutex.Unlock()
 	
