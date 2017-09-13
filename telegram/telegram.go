@@ -184,7 +184,7 @@ func (h *Telegram) Forward(msg *tgbotapi.Message) {
 	if botMsg != nil {
 		if msg.NewChatMember != nil {
 			botMsg.From = msg.NewChatMember.UserName
-			botMsg.UID = msg.NewChatMember.ID
+			botMsg.UID = int64(msg.NewChatMember.ID)
 		} else {
 			botMsg.From = msg.From.UserName
 			botMsg.UID = int64(msg.From.ID)
@@ -213,9 +213,16 @@ func (h *Telegram) GetPhotoFileID(photo *[]tgbotapi.PhotoSize) string {
 		minSize := math.MaxInt32
 		fileID := ""
 		for _, p := range *photo {
-			if p.FileSize < minSize {
-				minSize = p.FileSize
-				fileID = p.FileID
+			if p.Width <= 320 && p.Height <= 320 {
+				if p.FileSize > minSize {
+					minSize = p.FileSize
+					fileID = p.FileID
+				}
+			} else {
+				if p.FileSize < minSize {
+					minSize = p.FileSize
+					fileID = p.FileID
+				}
 			}
 		}
 		return fileID
