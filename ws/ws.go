@@ -304,7 +304,7 @@ func (ws *WSChatServer) AsyncGetAvbotMsg(msg *Message, cb func(*avbot.MessageInf
 	log.Println(botMsg)
 
 	if botMsg != nil {
-		botMsg.MessageId = ws.bot.GetIDAndInc()
+		dataMsg.MessageId = ws.bot.GetIDAndInc()
 		botMsg.Message = dataMsg
 		botMsg.Channel = ws
 
