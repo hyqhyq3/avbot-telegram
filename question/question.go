@@ -37,7 +37,9 @@ func (h *Hook) Process(bot *avbot.AVBot, msg *avbot.MessageInfo) bool {
 	if msg.Type == data.MessageType_NEW_MEMBER {
 
 		h.waitForAnswer[msg.UID] = true
-		bot.SendMessage(avbot.NewTextMessage(h, "["+msg.From+"](tg://user?id="+strconv.FormatInt(msg.UID, 10)+")"+` 请回答问题 printf("%#x", 65535); 的输出是多少？（你有60秒时间作答）`))
+		m := avbot.NewTextMessage(h, "["+msg.From+"](tg://user?id="+strconv.FormatInt(msg.UID, 10)+")"+` 请回答问题 printf("%#x", 65535); 的输出是多少？（你有60秒时间作答）`)
+		m.ParseMode = tgbotapi.ModeMarkdown
+		bot.SendMessage(m)
 		go func() {
 			<-time.After(time.Second * 60)
 			if b, ok := h.answered[msg.UID]; !b || !ok {

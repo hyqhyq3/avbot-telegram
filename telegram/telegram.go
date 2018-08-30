@@ -144,7 +144,7 @@ func (h *Telegram) Process(bot *avbot.AVBot, msg *avbot.MessageInfo) (processed 
 	switch msg.Type {
 	case data.MessageType_TEXT:
 		m := tgbotapi.NewMessage(h.ChatID, prefix+msg.Content)
-		m.ParseMode = tgbotapi.ModeMarkdown
+		m.ParseMode = msg.ParseMode
 		h.Send(m)
 	case data.MessageType_IMAGE:
 		log.Println("send image")

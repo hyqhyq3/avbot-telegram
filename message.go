@@ -11,6 +11,7 @@ type MessageInfo struct {
 	Channel   Component
 	ExtraData interface{}
 	MessageID int
+	ParseMode string
 }
 
 func NewTextMessage(c Component, text string) *MessageInfo {
