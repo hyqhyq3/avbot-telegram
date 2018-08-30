@@ -13,6 +13,7 @@ import (
 	"github.com/hyqhyq3/avbot-telegram/stat"
 	"github.com/hyqhyq3/avbot-telegram/telegram"
 	"github.com/hyqhyq3/avbot-telegram/ws"
+	"github.com/hyqhyq3/avbot-telegram/question"
 )
 
 type Config struct {
@@ -59,9 +60,11 @@ func main() {
 
 	token := config.Secret
 	bot := avbot.NewBot()
-	bot.AddComponent(telegram.New(token, config.Proxy.Socks5, config.GroupChatID))
+	tg := telegram.New(token, config.Proxy.Socks5, config.GroupChatID)
+	bot.AddComponent(tg)
 	bot.AddComponent(irc.New(bot, "#avplayer", "avbot-tg"))
 	bot.AddComponent(ws.New(bot, token, config.WebSocket.Port))
+	bot.AddComponent(question.New(tg))
 	// bot.AddComponent(joke.New())
 	bot.AddComponent(hello.New(config.Welcome))
 	bot.AddComponent(stat.New("stat.dat"))

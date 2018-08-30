@@ -29,10 +29,10 @@ type Telegram struct {
 	*tgbotapi.BotAPI
 	closeCh chan int
 	sendCh  chan<- *avbot.MessageInfo
-	chatId  int64
+	ChatID  int64
 }
 
-func New(token, socks5Addr string, chatId int64) *Telegram {
+func New(token, socks5Addr string, ChatID int64) *Telegram {
 	dial := net.Dial
 	if socks5Addr != "" {
 		dialer, err := proxy.SOCKS5("tcp", socks5Addr, nil, proxy.Direct)
@@ -52,7 +52,7 @@ func New(token, socks5Addr string, chatId int64) *Telegram {
 		panic(err)
 	}
 
-	h := &Telegram{BotAPI: bot, closeCh: make(chan int), chatId: chatId}
+	h := &Telegram{BotAPI: bot, closeCh: make(chan int), ChatID: ChatID}
 
 	avbot.RegisterFileProvider("tg", h)
 	avbot.RegisterFaceProvider("tg", h)
@@ -143,7 +143,9 @@ func (h *Telegram) Process(bot *avbot.AVBot, msg *avbot.MessageInfo) (processed 
 	}
 	switch msg.Type {
 	case data.MessageType_TEXT:
-		h.Send(tgbotapi.NewMessage(h.chatId, prefix+msg.Content))
+		m := tgbotapi.NewMessage(h.ChatID, prefix+msg.Content)
+		m.ParseMode = tgbotapi.ModeMarkdown
+		h.Send(m)
 	case data.MessageType_IMAGE:
 		log.Println("send image")
 		var tgmsg tgbotapi.Chattable
@@ -151,7 +153,7 @@ func (h *Telegram) Process(bot *avbot.AVBot, msg *avbot.MessageInfo) (processed 
 			if b, ok := msg.ExtraData.(*ws.WSImageData); ok {
 				log.Println("upload image")
 				name := getRandomImageName(b.Type)
-				photo := tgbotapi.NewPhotoUpload(h.chatId, tgbotapi.FileBytes{Bytes: b.Data, Name: name})
+				photo := tgbotapi.NewPhotoUpload(h.ChatID, tgbotapi.FileBytes{Bytes: b.Data, Name: name})
 				photo.Caption = prefix + msg.Content
 				tgmsg = photo
 				tgmsg2, err := h.Send(tgmsg)
@@ -160,7 +162,7 @@ func (h *Telegram) Process(bot *avbot.AVBot, msg *avbot.MessageInfo) (processed 
 				}
 			}
 		} else {
-			tgmsg = tgbotapi.NewPhotoShare(h.chatId, msg.FileID)
+			tgmsg = tgbotapi.NewPhotoShare(h.ChatID, msg.FileID)
 			h.Send(tgmsg)
 		}
 	}
@@ -178,13 +180,14 @@ func (h *Telegram) Forward(msg *tgbotapi.Message) {
 		botMsg = avbot.NewImageMessage(h, h.GetPhotoFileID(msg.Photo))
 	case msg.Document != nil:
 		botMsg = avbot.NewVideoMessage(h, h.GetDocumentFileID(msg.Document))
-	case msg.NewChatMember != nil:
+	case msg.NewChatMembers != nil:
 		botMsg = avbot.NewChatMemberMessage(h)
 	}
 	if botMsg != nil {
-		if msg.NewChatMember != nil {
-			botMsg.From = msg.NewChatMember.UserName
-			botMsg.UID = int64(msg.NewChatMember.ID)
+		botMsg.MessageID = msg.MessageID
+		if msg.NewChatMembers != nil {
+			botMsg.From = (*msg.NewChatMembers)[0].UserName
+			botMsg.UID = int64((*msg.NewChatMembers)[0].ID)
 		} else {
 			botMsg.From = msg.From.UserName
 			botMsg.UID = int64(msg.From.ID)

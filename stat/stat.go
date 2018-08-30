@@ -28,17 +28,15 @@ func New(filename string) (h *StatHook) {
 	h = &StatHook{}
 	h.filename = filename
 
-	b, err := ioutil.ReadFile(filename)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-
 	store := &Store{}
-	err = proto.Unmarshal(b, store)
-	if err != nil {
-		log.Fatal(err)
-		return
+
+	b, err := ioutil.ReadFile(filename)
+	if err == nil {
+		err = proto.Unmarshal(b, store)
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
 	}
 
 	if store.Users == nil {

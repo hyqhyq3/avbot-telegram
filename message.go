@@ -10,6 +10,7 @@ type MessageInfo struct {
 	*data.Message
 	Channel   Component
 	ExtraData interface{}
+	MessageID int
 }
 
 func NewTextMessage(c Component, text string) *MessageInfo {
