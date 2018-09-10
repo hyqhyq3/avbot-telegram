@@ -8,7 +8,7 @@ import (
 	"github.com/hyqhyq3/avbot-telegram"
 	"github.com/hyqhyq3/avbot-telegram/chatlog"
 	github "github.com/hyqhyq3/avbot-telegram/github-webhook"
-	"github.com/hyqhyq3/avbot-telegram/hello"
+	// "github.com/hyqhyq3/avbot-telegram/hello"
 	"github.com/hyqhyq3/avbot-telegram/irc"
 	"github.com/hyqhyq3/avbot-telegram/stat"
 	"github.com/hyqhyq3/avbot-telegram/telegram"
@@ -66,7 +66,7 @@ func main() {
 	bot.AddComponent(ws.New(bot, token, config.WebSocket.Port))
 	bot.AddComponent(question.New(tg))
 	// bot.AddComponent(joke.New())
-	bot.AddComponent(hello.New(config.Welcome))
+	// bot.AddComponent(hello.New(config.Welcome))
 	bot.AddComponent(stat.New("stat.dat"))
 	bot.AddComponent(chatlog.GetInstance())
 	chatlog.GetInstance().Init(config.ChatLog.Path)
